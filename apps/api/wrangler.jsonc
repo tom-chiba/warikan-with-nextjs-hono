@@ -10,12 +10,16 @@
   },
   "d1_databases": [
     {
+      // コードは env.DB を参照するため binding は "DB" にする。
       "binding": "DB",
       "database_name": "warikan-db",
-      // ローカル開発では参照されない。`wrangler d1 create warikan-db` 後に
-      // 払い出された ID へ置き換える（リモート適用・デプロイ時に必要）。
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      // `wrangler d1 create warikan-db` で払い出されたリモート D1 の ID。
+      "database_id": "f27e287a-37de-4f53-9a76-4e8c6ddd709f",
       "migrations_dir": "drizzle",
     },
   ],
+  "vars": {
+    "BETTER_AUTH_URL": "https://warikan-api.michiamo-t1.workers.dev",
+    "WEB_ORIGIN": "https://warikan-with-nextjs-hono-web.vercel.app",
+  },
 }

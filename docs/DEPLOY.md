@@ -33,9 +33,9 @@ api と web は URL を相互に参照するため（web は api の URL、api �
    pnpm --filter @warikan/api exec wrangler secret put BETTER_AUTH_SECRET
    ```
    （32 バイト以上のランダム値。例: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`）
-5. デプロイ:
+5. デプロイ（`deploy` は pnpm 組み込みコマンドと名前が衝突するため、必ず `run` を付ける）:
    ```
-   pnpm --filter @warikan/api deploy
+   pnpm --filter @warikan/api run deploy
    ```
    出力される Workers URL（例 `https://warikan-api.<subdomain>.workers.dev`）を控える。
 
@@ -53,8 +53,10 @@ api と web は URL を相互に参照するため（web は api の URL、api �
 
 ## 3. URL を相互反映（相互依存の解消）
 
-`apps/api/wrangler.jsonc` の `vars` に、確定した URL を設定する（非機密のため commit 可。
-ローカルの `.dev.vars` が優先されるため dev には影響しない）:
+`apps/api/wrangler.jsonc` の `vars` に、確定した URL を設定する（非機密のため commit 可）。
+**注意**: これらの top-level `vars` は `wrangler dev`（ローカル/CI の E2E）にも適用される。
+ローカル/CI では `.dev.vars` の `WEB_ORIGIN=http://localhost:3000` / `BETTER_AUTH_URL=http://localhost:8787`
+で必ず上書きすること（`.dev.vars` が `vars` より優先される）。CI は e2e ジョブでこの `.dev.vars` を生成している。
 
 ```jsonc
 "vars": {
@@ -71,7 +73,7 @@ api と web は URL を相互に参照するため（web は api の URL、api �
 設定後、api を再デプロイ:
 
 ```
-pnpm --filter @warikan/api deploy
+pnpm --filter @warikan/api run deploy
 ```
 
 ## 環境変数まとめ

@@ -1,4 +1,5 @@
 BETTER_AUTH_SECRET=replace-with-a-random-32-byte-secret
 BETTER_AUTH_URL=http://localhost:8787
-# 任意。許可するフロントエンドのオリジン（CORS / trustedOrigins）。未設定なら http://localhost:3000。
-# WEB_ORIGIN=http://localhost:3000
+# 許可するフロントエンドのオリジン（CORS / trustedOrigins）。
+# wrangler.jsonc の vars に本番 URL を置くため、ローカルでは必ず localhost で上書きする。
+WEB_ORIGIN=http://localhost:3000
