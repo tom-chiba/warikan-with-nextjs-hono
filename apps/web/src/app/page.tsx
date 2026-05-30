@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { AuthPanel } from "./auth-panel";
 
 export default function Home() {
   const { data, isPending, error } = useQuery({
@@ -26,6 +27,11 @@ export default function Home() {
       <p className="text-sm text-zinc-500">
         apps/api の <code>/hello</code> を Hono RPC + TanStack Query で型安全に取得
       </p>
+
+      <section className="mt-4 flex flex-col items-center gap-3 border-t border-zinc-200 pt-8 dark:border-zinc-800">
+        <h2 className="text-lg font-medium">アカウント</h2>
+        <AuthPanel />
+      </section>
     </main>
   );
 }

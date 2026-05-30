@@ -9,6 +9,9 @@ export function createAuth(env: Env) {
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
+    // ブラウザは別オリジン(dev: localhost:3000)から認証を呼ぶため、CSRF 用に信頼する。
+    // 本番では実際の web オリジンを設定する。
+    trustedOrigins: ["http://localhost:3000"],
     database: drizzleAdapter(createDb(env.DB), {
       provider: "sqlite",
       schema,
