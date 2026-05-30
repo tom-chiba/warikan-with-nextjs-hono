@@ -14,6 +14,7 @@ out/
 .wrangler/
 .dev.vars
 .dev.vars.*
+worker-configuration.d.ts
 
 # env
 .env

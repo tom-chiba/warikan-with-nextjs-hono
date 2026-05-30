@@ -2,6 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# ビルドスクリプト（postinstall 等）の実行を許可するパッケージ。既定は許可制のため
+# 個別に承認する。以下はいずれも wrangler 由来の正規依存（バンドラ/ランタイム/画像処理）。
+allowBuilds:
+  esbuild: true # wrangler のバンドラ。ネイティブバイナリ取得に postinstall が必要
+  sharp: true # miniflare のローカル Images 処理用ネイティブモジュール
+  workerd: true # Cloudflare Workers ランタイム本体
+
 # --- サプライチェーン対策（pnpm 11 の既定で有効なものは省略し、非デフォルトのみ記述）---
 # 公開直後の（乗っ取られた可能性のある）バージョンを避けるため、
 # 公開から指定分数が経過したバージョンのみインストールする。
