@@ -1,8 +1,7 @@
-import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { z } from "zod";
 import { createAuth } from "./auth";
+import { routes } from "./rpc";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -22,15 +21,9 @@ app.use(
 // フロントエンドは better-auth のクライアントから利用する）。
 app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw));
 
-// メソッドチェーンで定義したルートの型を AppType として公開し、
-// フロントエンド側で hc<AppType>() による型安全な RPC クライアントに利用する。
-const routes = app
-  .get("/", (c) => c.json({ message: "warikan API" }))
-  .get("/hello", zValidator("query", z.object({ name: z.string().optional() })), (c) => {
-    const { name } = c.req.valid("query");
-    return c.json({ message: `Hello, ${name ?? "world"}!` });
-  });
+// 型安全な RPC ルートをマウントする。型は ./rpc の AppType として公開する。
+app.route("/", routes);
 
-export type AppType = typeof routes;
+export type { AppType } from "./rpc";
 
 export default app;
