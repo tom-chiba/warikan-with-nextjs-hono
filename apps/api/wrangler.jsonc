@@ -19,7 +19,10 @@
     },
   ],
   "vars": {
-    "BETTER_AUTH_URL": "https://warikan-api.michiamo-t1.workers.dev",
-    "WEB_ORIGIN": "https://warikan-with-nextjs-hono-web.vercel.app",
+    // web と api を tom-chiba.com のサブドメインに揃え、Cookie を same-site 化している。
+    // これによりデフォルトの SameSite=Lax のままクロスオリジン fetch でも Cookie が送られる
+    // （SameSite=None / crossSubDomainCookies は不要）。
+    "BETTER_AUTH_URL": "https://warikan.api.tom-chiba.com",
+    "WEB_ORIGIN": "https://warikan.tom-chiba.com",
   },
 }

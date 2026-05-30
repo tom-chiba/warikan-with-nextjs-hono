@@ -38,6 +38,8 @@ api と web は URL を相互に参照するため（web は api の URL、api �
    pnpm --filter @warikan/api run deploy
    ```
    出力される Workers URL（例 `https://warikan-api.<subdomain>.workers.dev`）を控える。
+   本番ではカスタムドメイン `warikan.api.tom-chiba.com` を Workers に割り当てる
+   （Cloudflare ダッシュボード → Workers → Custom Domains）。
 
 ## 2. web（Vercel）
 
@@ -47,9 +49,10 @@ api と web は URL を相互に参照するため（web は api の URL、api �
    - **Framework Preset**: Next.js（自動検出）
    - Install/Build は pnpm ワークスペースを Vercel が自動処理
 3. 環境変数:
-   - `NEXT_PUBLIC_API_URL` = 手順 1 の Workers URL
+   - `NEXT_PUBLIC_API_URL` = api のカスタムドメイン `https://warikan.api.tom-chiba.com`
      （`NEXT_PUBLIC_` はビルド時にインライン化されるため、変更時は再デプロイが必要）
-4. デプロイし、Vercel の URL（例 `https://warikan.vercel.app`）を控える。
+4. デプロイ後、カスタムドメイン `warikan.tom-chiba.com` を Vercel プロジェクトに割り当てる
+   （Vercel → Project → Settings → Domains）。
 
 ## 3. URL を相互反映（相互依存の解消）
 
@@ -60,8 +63,8 @@ api と web は URL を相互に参照するため（web は api の URL、api �
 
 ```jsonc
 "vars": {
-  "BETTER_AUTH_URL": "https://warikan-api.<subdomain>.workers.dev",
-  "WEB_ORIGIN": "https://warikan.vercel.app"
+  "BETTER_AUTH_URL": "https://warikan.api.tom-chiba.com",
+  "WEB_ORIGIN": "https://warikan.tom-chiba.com"
 }
 ```
 
@@ -69,6 +72,11 @@ api と web は URL を相互に参照するため（web は api の URL、api �
   複数許可する場合はカンマ区切り（例: 本番 + 任意の preview）。
 - Vercel の preview デプロイは URL が動的なので、preview からも認証を使うなら
   該当オリジン（またはワイルドカード運用）を `WEB_ORIGIN` に追加する。
+- **same-site Cookie**: web (`warikan.tom-chiba.com`) と api (`warikan.api.tom-chiba.com`) は
+  登録ドメインが共通（`tom-chiba.com`）なので same-site。セッション Cookie は Better Auth 既定の
+  `SameSite=Lax` のまま same-site 扱いの fetch で送信されるため、`SameSite=None` や
+  `crossSubDomainCookies` の設定は不要（Cookie は api ホスト限定の host-only のままで安全）。
+  オリジン自体は別なので CORS（`credentials: true`）は引き続き必要。
 
 設定後、api を再デプロイ:
 
