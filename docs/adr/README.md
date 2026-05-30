@@ -21,3 +21,4 @@
 | 0005 | [API 連携に Hono RPC を採用](./0005-api-integration-hono-rpc.md)            | accepted |
 | 0006 | [D1 へのアクセスに Drizzle ORM を採用](./0006-orm-drizzle-d1.md)            | accepted |
 | 0007 | [認証に Better Auth を採用](./0007-auth-better-auth.md)                     | accepted |
+| 0008 | [テスト戦略](./0008-testing-strategy.md)                                    | accepted |
