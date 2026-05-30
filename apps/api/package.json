@@ -11,7 +11,9 @@
   },
   "scripts": {
     "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
+    "typecheck": "wrangler types && tsc --noEmit",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
@@ -20,6 +22,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "typescript": "^6",
     "wrangler": "^4.95.0"
   }
 }
