@@ -4,4 +4,7 @@
 interface Env {
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL: string;
+  // 許可するフロントエンドのオリジン（CORS / trustedOrigins）。未設定なら localhost:3000。
+  // カンマ区切りで複数指定可。
+  WEB_ORIGIN?: string;
 }

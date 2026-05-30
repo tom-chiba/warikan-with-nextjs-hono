@@ -7,15 +7,15 @@ const app = new Hono<{ Bindings: Env }>();
 
 // フロントエンドは別オリジン（dev: localhost:3000）から RPC・認証の双方を呼ぶため、
 // 全ルートに CORS を適用する。Better Auth はクッキーセッションを使うため credentials を許可。
+// 許可オリジンは実行時 env(WEB_ORIGIN) から取るため、リクエスト内で cors を構築する。
 // CORS はルート登録より前に置く必要がある。
-app.use(
-  "*",
+app.use("*", (c, next) =>
   cors({
-    origin: "http://localhost:3000",
+    origin: (c.env.WEB_ORIGIN ?? "http://localhost:3000").split(","),
     allowHeaders: ["Content-Type", "Authorization"],
     allowMethods: ["GET", "POST", "OPTIONS"],
     credentials: true,
-  }),
+  })(c, next),
 );
 
 // Better Auth のハンドラ（catch-all のため型付き RPC クライアントには含めない。
