@@ -19,3 +19,5 @@
 | 0003 | [Lint / Format に Oxc を採用](./0003-lint-format-oxc.md)                    | accepted |
 | 0004 | [pnpm によるサプライチェーン対策](./0004-supply-chain-hardening.md)         | accepted |
 | 0005 | [API 連携に Hono RPC を採用](./0005-api-integration-hono-rpc.md)            | accepted |
+| 0006 | [D1 へのアクセスに Drizzle ORM を採用](./0006-orm-drizzle-d1.md)            | accepted |
+| 0007 | [認証に Better Auth を採用](./0007-auth-better-auth.md)                     | accepted |
