@@ -3,7 +3,19 @@
   "name": "warikan-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-28",
+  // Better Auth が node:crypto などの Node API を使うため必須。
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true,
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "warikan-db",
+      // ローカル開発では参照されない。`wrangler d1 create warikan-db` 後に
+      // 払い出された ID へ置き換える（リモート適用・デプロイ時に必要）。
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "drizzle",
+    },
+  ],
 }
