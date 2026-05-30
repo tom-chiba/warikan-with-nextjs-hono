@@ -17,3 +17,9 @@ minimumReleaseAge: 4320 # 3 days
 # パッケージの信頼度が過去の版より下がった場合（provenance/信頼publisher の喪失 =
 # アカウント乗っ取りの兆候）にインストールを失敗させる。既定は off のため明示有効化。
 trustPolicy: no-downgrade
+
+# trustPolicy の例外。正規性を確認済みのもののみ、理由を添えて列挙する。
+trustPolicyExclude:
+  # tinyexec: vitest の推移依存。tinylibs 製の正規パッケージで 1.2.2 は provenance 証明あり。
+  # 「trusted-publisher → provenance」を no-downgrade が降格扱いする誤検知のため除外。
+  - tinyexec
