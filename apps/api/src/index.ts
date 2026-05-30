@@ -5,10 +5,11 @@ import { routes } from "./rpc";
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Better Auth はクッキーセッションを使うため、フロントエンドのオリジンに対して
-// credentials を許可する。CORS はルート登録より前に置く必要がある。
+// フロントエンドは別オリジン（dev: localhost:3000）から RPC・認証の双方を呼ぶため、
+// 全ルートに CORS を適用する。Better Auth はクッキーセッションを使うため credentials を許可。
+// CORS はルート登録より前に置く必要がある。
 app.use(
-  "/api/auth/*",
+  "*",
   cors({
     origin: "http://localhost:3000",
     allowHeaders: ["Content-Type", "Authorization"],

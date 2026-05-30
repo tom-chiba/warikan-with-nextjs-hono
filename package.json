@@ -8,12 +8,15 @@
     "build": "pnpm -r run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "format": "oxfmt",
     "format:check": "oxfmt --check"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "oxfmt": "^0.52.0",
     "oxlint": "^1.67.0"
   },
