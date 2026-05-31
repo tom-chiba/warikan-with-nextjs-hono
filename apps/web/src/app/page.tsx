@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { AuthPanel } from "./auth-panel";
 
@@ -32,6 +33,10 @@ export default function Home() {
         <h2 className="text-lg font-medium">アカウント</h2>
         <AuthPanel />
       </section>
+
+      <Link href="/groups" className="rounded-md border px-4 py-2">
+        グループ
+      </Link>
     </main>
   );
 }
