@@ -81,27 +81,31 @@ export const groups = new Hono<{
   })
   // 招待リンクを発行する（メンバーなら誰でも可）。
   // グループごとに有効リンクは原則 1 本にするため、既存の未失効トークンを失効させてから新規発行する。
-  // D1 はバッチ非対応のため失効 UPDATE と発行 INSERT は非アトミック。両者の間で処理が中断すると
-  // 一時的に有効リンクが 0 本になりうるが、再発行で自己回復するため許容する（ADR-0010）。
+  // 失効 UPDATE と発行 INSERT はいずれも事前に値が確定する独立文なので、db.batch()（D1 の暗黙の
+  // SQL トランザクション = all-or-nothing）で 1 トランザクションにまとめて原子化する。これにより
+  // 「失効だけ済んで発行に失敗し、有効リンクが一時的に 0 本になる」中間状態が生じない（ADR-0010）。
+  // batch は逐次実行されるため、先に既存の未失効トークンを失効 → 後から新規トークンを挿入する
+  //（失効 UPDATE の時点で新トークンはまだ存在しないため、新トークンが巻き添えで失効することはない）。
   .post("/:groupId/invitations", async (c) => {
     const member = c.get("groupMember");
     const user = c.get("user");
     const db = c.get("db");
 
     const now = new Date();
-    await db
-      .update(groupInvitation)
-      .set({ revokedAt: now })
-      .where(and(eq(groupInvitation.groupId, member.groupId), isNull(groupInvitation.revokedAt)));
-
     const token = generateInvitationToken();
     const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS);
-    await db.insert(groupInvitation).values({
-      token,
-      groupId: member.groupId,
-      invitedBy: user.id,
-      expiresAt,
-    });
+    await db.batch([
+      db
+        .update(groupInvitation)
+        .set({ revokedAt: now })
+        .where(and(eq(groupInvitation.groupId, member.groupId), isNull(groupInvitation.revokedAt))),
+      db.insert(groupInvitation).values({
+        token,
+        groupId: member.groupId,
+        invitedBy: user.id,
+        expiresAt,
+      }),
+    ]);
 
     return c.json({ token, expiresAt: expiresAt.toISOString() }, 201);
   })
