@@ -39,13 +39,21 @@ export default function GroupsPage() {
     try {
       const res = await apiClient.groups.$post({ json: { name } });
       if (!res.ok) {
-        throw new Error("グループの作成に失敗しました");
+        // requireAuth はミドルウェア適用のため RPC 型に 401 が現れない。
+        // 実行時には返るので number に広げてセッション切れを区別する。
+        const status: number = res.status;
+        throw new Error(
+          status === 401
+            ? "セッションが切れました。再度サインインしてください。"
+            : "グループの作成に失敗しました",
+        );
       }
       const { id } = await res.json();
       // 作成後はそのグループの画面へ遷移する。
       router.push(`/groups/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "グループの作成に失敗しました");
+    } finally {
       setSubmitting(false);
     }
   }
