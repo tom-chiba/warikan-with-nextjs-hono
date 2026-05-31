@@ -16,6 +16,11 @@
       }
     ]
   },
+  "autoMode": {
+    "environment": [
+      "$defaults"
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(ls *)",
@@ -25,6 +30,7 @@
       "Bash(grep *)",
       "Bash(git add *)",
       "Bash(git commit *)",
+      "Bash(git push *)",
       "Bash(git status *)",
       "Bash(git diff *)",
       "Bash(git log *)",
