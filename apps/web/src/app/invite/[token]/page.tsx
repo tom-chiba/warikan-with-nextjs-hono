@@ -18,7 +18,12 @@ export default function InvitePage() {
   const [error, setError] = useState<string | null>(null);
 
   // 招待のプレビュー（グループ名・有効性・参加済みか）。ログイン済みのときだけ取得する。
-  const { data: preview, isPending: previewLoading } = useQuery({
+  const {
+    data: preview,
+    isPending: previewLoading,
+    isError: previewError,
+    refetch: refetchPreview,
+  } = useQuery({
     queryKey: ["invitation-preview", token],
     enabled: !!session,
     queryFn: async () => {
@@ -72,6 +77,19 @@ export default function InvitePage() {
       <h1 className="text-2xl font-semibold">グループへの招待</h1>
 
       {previewLoading && <p className="text-zinc-500">招待を確認中…</p>}
+
+      {previewError && (
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-red-500">招待の確認中にエラーが発生しました。</p>
+          <button
+            type="button"
+            onClick={() => refetchPreview()}
+            className="rounded-md border px-4 py-2"
+          >
+            再試行
+          </button>
+        </div>
+      )}
 
       {preview && !preview.valid && (
         <div className="flex flex-col items-center gap-3">

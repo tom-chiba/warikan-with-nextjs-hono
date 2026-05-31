@@ -98,3 +98,20 @@ test("無効・期限切れの招待はエラー表示になる", async () => {
     await screen.findByText("この招待リンクは無効か、有効期限が切れています。"),
   ).toBeInTheDocument();
 });
+
+test("プレビュー取得に失敗したらエラーと再試行を表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 1 回目は失敗、再試行で成功させる。
+  getMock.mockResolvedValueOnce({ ok: false }).mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ valid: true, groupId: "g1", groupName: "京都旅行", alreadyMember: false }),
+  });
+
+  renderWithClient(<InvitePage />);
+
+  expect(await screen.findByText("招待の確認中にエラーが発生しました。")).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "再試行" }));
+
+  expect(await screen.findByText("京都旅行")).toBeInTheDocument();
+});
