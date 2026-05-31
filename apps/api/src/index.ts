@@ -32,6 +32,9 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.ra
 // コレクションレベル（/groups: 作成・一覧）はメンバーシップ不要だがログインは必須。
 // db を使うため provideDb も適用する（:groupId を伴わないため requireGroupMember は掛けない）。
 app.use("/groups", requireAuth(), provideDb());
+// 招待トークンからの参加フロー（/invitations/*）。ログインは必須だが、まだ当該グループの
+// メンバーではないため requireGroupMember は通さない（メンバーシップ不要・ログイン必須）。
+app.use("/invitations/*", requireAuth(), provideDb());
 // member 限定（/groups/:groupId/*）はログイン + 当該グループ所属を要求する。
 // ハンドラが db を使うため provideDb も適用する（順序: 認証 → db 注入 → メンバー確認）。
 app.use("/groups/:groupId/*", requireAuth(), provideDb(), requireGroupMember());
