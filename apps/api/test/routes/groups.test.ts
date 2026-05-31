@@ -32,4 +32,18 @@ describe("保護ルート /groups/:groupId", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ groupId: "group-pass", role: "owner" });
   });
+
+  it("別グループのメンバーが所属しないグループにアクセスすると 403 を返す", async () => {
+    // ユーザーは group-a のメンバーだが、所属しない group-b にアクセスする。
+    // requireGroupMember の (groupId, userId) 絞り込みが効いていることを保証する。
+    const cookie = await signUpAndGetCookie("cross@example.com");
+    const userId = await getUserId(env.DB, "cross@example.com");
+    await joinGroup("group-a", userId, "member");
+
+    const res = await SELF.fetch(`${BASE}/groups/group-b/members`, {
+      headers: { cookie },
+    });
+
+    expect(res.status).toBe(403);
+  });
 });
