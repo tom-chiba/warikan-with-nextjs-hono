@@ -120,7 +120,18 @@ export default function GroupPage() {
     }
   }
 
-  async function handleRemove(userId: string, isSelf: boolean) {
+  async function handleRemove(userId: string, isSelf: boolean, name: string) {
+    // 退出・削除は取り消せない破壊的操作なので確認を挟む。
+    // 自分が最後の 1 人なら退出でグループ本体（と関連データ）が消えるため、その旨を明示する。
+    const isLastMember = isSelf && members.length === 1;
+    const message = isLastMember
+      ? "あなたが退出するとこのグループは削除されます。よろしいですか？"
+      : isSelf
+        ? "このグループから退出しますか？"
+        : `「${name}」をグループから削除しますか？`;
+    if (!window.confirm(message)) {
+      return;
+    }
     setError(null);
     setBusy(true);
     try {
@@ -151,9 +162,11 @@ export default function GroupPage() {
         グループ ID: <span className="font-mono">{groupId}</span>
       </p>
 
+      {/* 招待リンク・メンバー操作の双方のエラーをここに集約表示する。 */}
+      {error && <p className="w-full max-w-md text-sm text-red-500">{error}</p>}
+
       <section className="flex w-full max-w-md flex-col gap-3">
         <h2 className="text-lg font-medium">招待リンク</h2>
-        {error && <p className="text-sm text-red-500">{error}</p>}
         {inviteUrl ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-zinc-500">
@@ -229,7 +242,7 @@ export default function GroupPage() {
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => handleRemove(m.userId, isSelf)}
+                        onClick={() => handleRemove(m.userId, isSelf, m.name)}
                         className="rounded-md border px-3 py-1 text-sm text-red-600 disabled:opacity-50"
                       >
                         {isSelf ? "退出" : "削除"}

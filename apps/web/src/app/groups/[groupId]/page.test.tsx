@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const {
   useSessionMock,
@@ -13,6 +13,7 @@ const {
   memberDeleteMock,
   pushMock,
   clipboardMock,
+  confirmMock,
 } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
   activeGetMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
   memberDeleteMock: vi.fn(),
   pushMock: vi.fn(),
   clipboardMock: vi.fn(),
+  confirmMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -54,6 +56,12 @@ import GroupPage from "./page";
 Object.defineProperty(navigator, "clipboard", {
   value: { writeText: clipboardMock },
   configurable: true,
+});
+Object.defineProperty(window, "confirm", { value: confirmMock, configurable: true });
+
+beforeEach(() => {
+  // 破壊的操作の確認ダイアログは既定で承認扱いにする（キャンセル挙動は個別にテストする）。
+  confirmMock.mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -184,4 +192,44 @@ test("自分が退出するとグループ一覧へ遷移する", async () => {
     expect(memberDeleteMock).toHaveBeenCalledWith({ param: { groupId: "g1", userId: "u1" } });
     expect(pushMock).toHaveBeenCalledWith("/groups");
   });
+});
+
+test("退出の確認をキャンセルすると削除 API は呼ばれない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setDefaults();
+  confirmMock.mockReturnValue(false);
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "退出" }));
+
+  expect(memberDeleteMock).not.toHaveBeenCalled();
+  expect(pushMock).not.toHaveBeenCalled();
+});
+
+test("メンバー削除に失敗するとエラーメッセージを表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  activeGetMock.mockResolvedValue({ ok: true, json: async () => ({ invitation: null }) });
+  membersGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      members: [
+        { userId: "u1", name: "わたし", email: "me@example.com", role: "owner", joinedAt: nowIso },
+        {
+          userId: "u2",
+          name: "ともだち",
+          email: "f@example.com",
+          role: "member",
+          joinedAt: nowIso,
+        },
+      ],
+    }),
+  });
+  memberDeleteMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "削除" }));
+
+  expect(await screen.findByText("メンバーの削除に失敗しました")).toBeInTheDocument();
 });

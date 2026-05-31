@@ -93,6 +93,27 @@ describe("DELETE /groups/:groupId/members/:userId（削除・退出）", () => {
     expect(group).toBeNull();
   });
 
+  it("グループ削除時に関連する招待リンクも CASCADE で消える", async () => {
+    const ownerCookie = await signUpAndGetCookie("mm-cascade@example.com");
+    const groupId = await createGroup(ownerCookie);
+    const ownerId = await getUserId(env.DB, "mm-cascade@example.com");
+    // 招待リンクを 1 本発行しておき、グループ削除で子レコードが残らないことを確認する。
+    const issued = await SELF.fetch(`${BASE}/groups/${groupId}/invitations`, {
+      method: "POST",
+      headers: { cookie: ownerCookie },
+    });
+    expect(issued.status).toBe(201);
+
+    const res = await deleteMember(ownerCookie, groupId, ownerId);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ removed: true, groupDeleted: true });
+    const invitation = await env.DB.prepare("SELECT token FROM group_invitation WHERE group_id = ?")
+      .bind(groupId)
+      .first();
+    expect(invitation).toBeNull();
+  });
+
   it("存在しないメンバーの削除は 404", async () => {
     const ownerCookie = await signUpAndGetCookie("mm-404@example.com");
     const groupId = await createGroup(ownerCookie);
