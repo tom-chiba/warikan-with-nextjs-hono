@@ -94,6 +94,38 @@ describe("グループ招待リンク", () => {
     expect(del.status).toBe(404);
   });
 
+  it("他グループのスコープでは別グループのトークンを無効化できない（404 で、元の招待は有効なまま）", async () => {
+    // グループ A のメンバーが招待リンク（tokenA）を発行する。
+    const aCookie = await signUpAndGetCookie("cross-a@example.com");
+    const groupA = await createGroup(aCookie, "グループA");
+    const { token: tokenA } = (await (await issueInvite(aCookie, groupA)).json()) as {
+      token: string;
+    };
+
+    // 別ユーザーが自分のグループ B を作り、B のスコープで tokenA の無効化を試みる。
+    const bCookie = await signUpAndGetCookie("cross-b@example.com");
+    const groupB = await createGroup(bCookie, "グループB");
+
+    const del = await SELF.fetch(`${BASE}/groups/${groupB}/invitations/${tokenA}`, {
+      method: "DELETE",
+      headers: { cookie: bCookie },
+    });
+    // group_id で絞っているため B のスコープでは tokenA に一致せず 404。
+    expect(del.status).toBe(404);
+
+    // tokenA は未失効のまま。A の active としても引き続き取得できる。
+    const row = await env.DB.prepare("SELECT revoked_at FROM group_invitation WHERE token = ?")
+      .bind(tokenA)
+      .first<{ revoked_at: number | null }>();
+    expect(row?.revoked_at).toBeNull();
+
+    const active = await SELF.fetch(`${BASE}/groups/${groupA}/invitations/active`, {
+      headers: { cookie: aCookie },
+    });
+    const { invitation } = (await active.json()) as { invitation: { token: string } | null };
+    expect(invitation?.token).toBe(tokenA);
+  });
+
   it("所属しないグループへの招待発行は 403", async () => {
     const ownerCookie = await signUpAndGetCookie("owner-inv@example.com");
     const groupId = await createGroup(ownerCookie);

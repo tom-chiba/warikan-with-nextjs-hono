@@ -17,7 +17,7 @@ export default function GroupPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 現在有効な招待リンク（未失効・期限内）を取得する。
-  const { data: inviteData } = useQuery({
+  const { data: inviteData, error: fetchError } = useQuery({
     queryKey: ["invitation", groupId],
     enabled: !!session,
     queryFn: async () => {
@@ -111,7 +111,12 @@ export default function GroupPage() {
 
       <section className="flex w-full max-w-md flex-col gap-3">
         <h2 className="text-lg font-medium">招待リンク</h2>
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {(error || fetchError) && (
+          <p className="text-sm text-red-500">
+            {error ??
+              (fetchError instanceof Error ? fetchError.message : "招待リンクの取得に失敗しました")}
+          </p>
+        )}
         {inviteUrl ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-zinc-500">
