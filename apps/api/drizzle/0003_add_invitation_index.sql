@@ -1,0 +1,1 @@
+CREATE INDEX `group_invitation_group_id_revoked_at_idx` ON `group_invitation` (`group_id`,`revoked_at`);

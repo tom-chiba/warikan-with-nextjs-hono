@@ -21,11 +21,14 @@ export const groupsCollection = new Hono<{
       const db = c.get("db");
 
       // 作成者を owner として group_member に登録する。id は JS 側で確定させ、両テーブルで共有する。
-      // D1 は基底型 BaseSQLiteDatabase 経由ではバッチ/トランザクションを扱えないため逐次挿入とする。
-      // 仮に member 挿入が失敗してもオーナー不在のグループは誰の一覧にも現れず実害がない。
+      // group と group_member の挿入は原子的でなければならない（片方だけ成功するとオーナー不在の
+      // ゴミグループが残る）。D1 は対話的トランザクション非対応で db.transaction() が実行時に失敗する
+      // ため、暗黙の SQL トランザクションとして all-or-nothing を保証する db.batch() を使う。
       const id = crypto.randomUUID();
-      await db.insert(group).values({ id, name });
-      await db.insert(groupMember).values({ groupId: id, userId: user.id, role: "owner" });
+      await db.batch([
+        db.insert(group).values({ id, name }),
+        db.insert(groupMember).values({ groupId: id, userId: user.id, role: "owner" }),
+      ]);
 
       return c.json({ id, name }, 201);
     },
@@ -36,12 +39,13 @@ export const groupsCollection = new Hono<{
 
     // 自分が所属するグループだけを返す。group_member を起点に join し、
     // オーナー不在などのゴミデータ（group 単独行）を拾わないようにする（ADR-0010）。
+    // joinedAt が同値（短時間に複数作成）でも順序が一意に定まるよう group.id をタイブレークに足す。
     const groups = await db
       .select({ id: group.id, name: group.name, role: groupMember.role })
       .from(groupMember)
       .innerJoin(group, eq(groupMember.groupId, group.id))
       .where(eq(groupMember.userId, user.id))
-      .orderBy(groupMember.joinedAt);
+      .orderBy(groupMember.joinedAt, group.id);
 
     return c.json({ groups });
   });

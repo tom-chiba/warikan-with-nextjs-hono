@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Better Auth のコアスキーマ（メール + パスワード）を Drizzle(SQLite/D1) で定義する。
 // プロパティ名は Better Auth のフィールド名（camelCase）に一致させ、
@@ -108,21 +108,27 @@ export const groupMember = sqliteTable(
 // グループ招待リンク。トークン付き URL でメンバーを集める。
 // token は推測困難なランダム文字列を主キーとする。期限内かつ未失効（revokedAt IS NULL）なら有効。
 // グループごとに有効リンクは原則 1 本（再発行時に既存の有効トークンを失効させる）。
-export const groupInvitation = sqliteTable("group_invitation", {
-  token: text("token").primaryKey(),
-  groupId: text("group_id")
-    .notNull()
-    .references(() => group.id, { onDelete: "cascade" }),
-  // 発行者（監査用メタ情報）。発行者がアカウント削除されても、グループに残る他メンバーが
-  // 共有中のリンクを生かし続けられるよう、CASCADE ではなく SET NULL とする（nullable）。
-  invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-  // 無効化時刻。null なら未失効。明示的な無効化・再発行時にこの列を打つ。
-  revokedAt: integer("revoked_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .$defaultFn(() => new Date())
-    .notNull(),
-});
+export const groupInvitation = sqliteTable(
+  "group_invitation",
+  {
+    token: text("token").primaryKey(),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => group.id, { onDelete: "cascade" }),
+    // 発行者（監査用メタ情報）。発行者がアカウント削除されても、グループに残る他メンバーが
+    // 共有中のリンクを生かし続けられるよう、CASCADE ではなく SET NULL とする（nullable）。
+    invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
+    expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+    // 無効化時刻。null なら未失効。明示的な無効化・再発行時にこの列を打つ。
+    revokedAt: integer("revoked_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  // 有効リンク取得（active）・再発行時の一括失効はいずれも groupId + revokedAt で絞るため、
+  // この複合インデックスでグループ単位のフルスキャンを避ける。
+  (t) => [index("group_invitation_group_id_revoked_at_idx").on(t.groupId, t.revokedAt)],
+);
 
 // 購入品。status は未精算/精算済の 2 状態。
 export const item = sqliteTable("item", {

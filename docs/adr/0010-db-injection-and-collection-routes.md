@@ -32,13 +32,14 @@ deciders: tom-chiba
 **DB はミドルウェアで生成して Variables に注入し、その型はドライバ非依存の `BaseSQLiteDatabase` とする。コレクションルートは `requireAuth` のみ（+ `provideDb`）で保護する。**
 
 - **`provideDb` ミドルウェア**: `src/middleware/provide-db.ts` に置き、`c.set("db", createDb(c.env.DB))` でリクエストスコープの Drizzle を Variables に載せる。`Env`/`D1Database` 依存はこのミドルウェア（`index.ts` グラフ）に閉じる。
-- **`DbVariables` 型**: `src/context.ts` に `db: BaseSQLiteDatabase<"async", unknown, typeof schema>` として一元定義する。`BaseSQLiteDatabase`（`drizzle-orm/sqlite-core`）は Workers 固有型を参照しないため `AppType` に混入しない。`DrizzleD1Database` は `BaseSQLiteDatabase` に代入可能なので、注入時にキャストは不要。ただし `batch`／対話的トランザクションは基底型に無いため、書き込みは逐次 `insert` で行う（D1 はそもそも対話的トランザクション非対応）。
+- **`DbVariables` 型**: `src/context.ts` に `db: BaseSQLiteDatabase<"async", unknown, typeof schema>` として一元定義する。`BaseSQLiteDatabase`（`drizzle-orm/sqlite-core`）は Workers 固有型を参照しないため `AppType` に混入しない。`DrizzleD1Database` は `BaseSQLiteDatabase` に代入可能なので、注入時にキャストは不要。複数テーブルへの原子的な書き込みのため、`DrizzleD1Database.batch` と同一シグネチャの `batch`（`BatchItem`/`BatchResponse` は `D1Result` 等の Workers 固有型を参照しない）を交差型として `DbVariables` に付与する。これで `AppType` を web-safe に保ったまま `db.batch([...])` を型安全に呼べる。D1 は対話的トランザクション非対応で `db.transaction()`（生 `BEGIN`/`COMMIT` を発行）が実行時に失敗するため、`transaction()` は使わず `batch`（暗黙の SQL トランザクション = all-or-nothing）を用いる。
 - **コレクションルート**: `:groupId` を伴わない `/groups`（作成・一覧）は `new Hono<{ Variables: AuthVariables & DbVariables }>()` で宣言し、`index.ts` で `app.use("/groups", requireAuth(), provideDb())` を `app.route("/", routes)` より前に適用する。`app.use` の静的パスは完全一致なので、メンバー限定の `/groups/:groupId/*` とは独立に効く。
 
 ### Consequences
 
 - 良い点: ハンドラは `c.get("db")` で型安全に DB を操作でき、`rpc.ts` グラフは Workers 固有型に非依存のまま（web の `AppType` 解決が壊れない）。DB 注入パターンは後続のドメイン RPC（item CRUD・精算など）でも再利用できる。ログイン要否とメンバーシップ要否がミドルウェアの適用パスで明確に分離される。
-- 悪い点 / トレードオフ: `batch` が使えないため複数テーブルへの書き込みは非アトミックになる（例: グループ作成で `group` 挿入後に `group_member` 挿入が失敗するとオーナー不在のグループが残りうる）。当面は「オーナー不在グループは所属メンバーがおらず一覧に出ない」ため実害がないと判断する。アトミック性が要る操作が出たら、`index.ts` グラフ側にリポジトリ層（web-safe なインターフェースを Variables 注入）を設けて `batch` を使う案に拡張する。
+- 良い点（追補）: `DbVariables` に web-safe な `batch` を付与したことで、グループ作成（`group` + `group_member`）のような複数テーブル書き込みを `db.batch([...])` で原子的に行える。片方だけ成功してオーナー不在グループが残ることはない（`group_member` 挿入が失敗すれば `group` 挿入もロールバックされる）。
+- 悪い点 / トレードオフ: D1 は対話的トランザクション非対応のため、読み取り結果に応じて分岐しながら複数文を 1 トランザクションに収める用途（read-modify-write）は `batch` では表現できない。現状の書き込みはいずれも事前に値が確定する独立 `insert` のため `batch` で足りるが、対話的な整合性が必要な操作が出たら別途設計が要る。
 - 注意: 一覧系はゴミデータを拾わないよう、必ず `group_member` を起点に取得する（`group` テーブルの直読みをしない）。
 
 ## More Information

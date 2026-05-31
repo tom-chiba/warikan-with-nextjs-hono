@@ -81,6 +81,18 @@ test("所属が 0 件のときは作成を促す表示になる", async () => {
   ).toBeInTheDocument();
 });
 
+test("一覧取得に失敗したときはエラーを表示し、0 件表示はしない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  getMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+
+  renderWithClient(<GroupsPage />);
+
+  expect(await screen.findByText("グループ一覧の取得に失敗しました。")).toBeInTheDocument();
+  expect(
+    screen.queryByText("まだグループがありません。下のフォームから作成しましょう。"),
+  ).not.toBeInTheDocument();
+});
+
 test("グループ名を入力して作成すると、作成したグループ画面へ遷移する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   getMock.mockResolvedValue({ ok: true, json: async () => ({ groups: [] }) });

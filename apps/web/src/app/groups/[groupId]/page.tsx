@@ -18,7 +18,7 @@ export default function GroupPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 現在有効な招待リンク（未失効・期限内）を取得する。
-  const { data: inviteData } = useQuery({
+  const { data: inviteData, error: fetchError } = useQuery({
     queryKey: ["invitation", groupId],
     enabled: !!session,
     queryFn: async () => {
@@ -162,8 +162,13 @@ export default function GroupPage() {
         グループ ID: <span className="font-mono">{groupId}</span>
       </p>
 
-      {/* 招待リンク・メンバー操作の双方のエラーをここに集約表示する。 */}
-      {error && <p className="w-full max-w-md text-sm text-red-500">{error}</p>}
+      {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
+      {(error || fetchError) && (
+        <p className="w-full max-w-md text-sm text-red-500">
+          {error ??
+            (fetchError instanceof Error ? fetchError.message : "招待リンクの取得に失敗しました")}
+        </p>
+      )}
 
       <section className="flex w-full max-w-md flex-col gap-3">
         <h2 className="text-lg font-medium">招待リンク</h2>

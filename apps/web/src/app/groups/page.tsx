@@ -17,7 +17,11 @@ export default function GroupsPage() {
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
-  const { data: groupsData, isPending: groupsLoading } = useQuery({
+  const {
+    data: groupsData,
+    isPending: groupsLoading,
+    isError: groupsError,
+  } = useQuery({
     queryKey: ["groups"],
     enabled: !!session,
     queryFn: async () => {
@@ -55,7 +59,14 @@ export default function GroupsPage() {
     try {
       const res = await apiClient.groups.$post({ json: { name } });
       if (!res.ok) {
-        throw new Error("グループの作成に失敗しました");
+        // requireAuth はミドルウェア適用のため RPC 型に 401 が現れない。
+        // 実行時には返るので number に広げてセッション切れを区別する。
+        const status: number = res.status;
+        throw new Error(
+          status === 401
+            ? "セッションが切れました。再度サインインしてください。"
+            : "グループの作成に失敗しました",
+        );
       }
       const { id } = await res.json();
       // 一覧を最新化してから、作成したグループの画面へ遷移する。
@@ -63,6 +74,7 @@ export default function GroupsPage() {
       router.push(`/groups/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "グループの作成に失敗しました");
+    } finally {
       setSubmitting(false);
     }
   }
@@ -76,7 +88,8 @@ export default function GroupsPage() {
       <section className="flex w-full max-w-xs flex-col gap-3">
         <h2 className="text-lg font-medium">所属グループ</h2>
         {groupsLoading && <p className="text-zinc-500">読み込み中…</p>}
-        {!groupsLoading && groups.length === 0 && (
+        {groupsError && <p className="text-sm text-red-500">グループ一覧の取得に失敗しました。</p>}
+        {!groupsLoading && !groupsError && groups.length === 0 && (
           <p className="text-sm text-zinc-500">
             まだグループがありません。下のフォームから作成しましょう。
           </p>
