@@ -1,7 +1,7 @@
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, notExists } from "drizzle-orm";
 import { Hono } from "hono";
 import type { DbVariables, GroupMemberVariables } from "../context";
-import { groupInvitation } from "../db/schema";
+import { group, groupInvitation, groupMember, user } from "../db/schema";
 import { generateInvitationToken } from "../lib/token";
 
 // 招待リンクの有効期限（発行から 7 日間）。
@@ -14,33 +14,98 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const groups = new Hono<{
   Variables: GroupMemberVariables & DbVariables;
 }>()
-  .get("/:groupId/members", (c) => {
+  // グループのメンバー一覧を返す。各メンバーの表示用情報（name/email）と role/joinedAt を含む。
+  .get("/:groupId/members", async (c) => {
     const member = c.get("groupMember");
-    return c.json({ groupId: member.groupId, role: member.role });
+    const db = c.get("db");
+
+    const members = await db
+      .select({
+        userId: groupMember.userId,
+        name: user.name,
+        email: user.email,
+        role: groupMember.role,
+        joinedAt: groupMember.joinedAt,
+      })
+      .from(groupMember)
+      .innerJoin(user, eq(groupMember.userId, user.id))
+      .where(eq(groupMember.groupId, member.groupId))
+      .orderBy(groupMember.joinedAt);
+
+    return c.json({
+      members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })),
+    });
+  })
+  // メンバーを削除（他者削除）または退出（自分の削除）する。
+  // 自分自身は常に退出可。他メンバーの削除は owner のみ可。
+  // 最後の 1 人が抜けた場合はグループ自体も削除する（関連データは CASCADE で消える）。
+  .delete("/:groupId/members/:userId", async (c) => {
+    const caller = c.get("groupMember");
+    const targetUserId = c.req.param("userId");
+    const db = c.get("db");
+
+    const isSelf = targetUserId === caller.userId;
+    if (!isSelf && caller.role !== "owner") {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    // メンバー削除と「最後の 1 人なら group も削除」を 1 つの batch（D1 の暗黙の SQL トランザクション
+    // ＝ all-or-nothing）で原子的に行う。group 削除はメンバー削除後の残数に依存するため、その条件を
+    // NOT EXISTS サブクエリで SQL 内に閉じ込め、batch 内の逐次実行（2 文目は 1 文目の削除を観測する）
+    // に委ねる。これにより「メンバーだけ消えて group 削除が漏れる」中間状態が発生しない。
+    // group 削除時の関連データ（invitation 等）は外部キー CASCADE で消える。
+    // D1 は対話的トランザクション（db.transaction()）非対応のため batch を用いる（groups-collection と同方針）。
+    const [deleted, deletedGroup] = await db.batch([
+      db
+        .delete(groupMember)
+        .where(and(eq(groupMember.groupId, caller.groupId), eq(groupMember.userId, targetUserId)))
+        .returning({ userId: groupMember.userId }),
+      db
+        .delete(group)
+        .where(
+          and(
+            eq(group.id, caller.groupId),
+            notExists(db.select().from(groupMember).where(eq(groupMember.groupId, caller.groupId))),
+          ),
+        )
+        .returning({ id: group.id }),
+    ]);
+
+    // 対象メンバーが存在しなければ削除は 0 件（404）。このとき呼び出し元は必ずメンバーとして残る
+    // ため group も削除されず、batch は無害（何も変更しない）。
+    if (deleted.length === 0) {
+      return c.json({ error: "Not Found" }, 404);
+    }
+
+    return c.json({ removed: true, groupDeleted: deletedGroup.length > 0 });
   })
   // 招待リンクを発行する（メンバーなら誰でも可）。
   // グループごとに有効リンクは原則 1 本にするため、既存の未失効トークンを失効させてから新規発行する。
-  // D1 はバッチ非対応のため失効 UPDATE と発行 INSERT は非アトミック。両者の間で処理が中断すると
-  // 一時的に有効リンクが 0 本になりうるが、再発行で自己回復するため許容する（ADR-0010）。
+  // 失効 UPDATE と発行 INSERT はいずれも事前に値が確定する独立文なので、db.batch()（D1 の暗黙の
+  // SQL トランザクション = all-or-nothing）で 1 トランザクションにまとめて原子化する。これにより
+  // 「失効だけ済んで発行に失敗し、有効リンクが一時的に 0 本になる」中間状態が生じない（ADR-0010）。
+  // batch は逐次実行されるため、先に既存の未失効トークンを失効 → 後から新規トークンを挿入する
+  //（失効 UPDATE の時点で新トークンはまだ存在しないため、新トークンが巻き添えで失効することはない）。
   .post("/:groupId/invitations", async (c) => {
     const member = c.get("groupMember");
     const user = c.get("user");
     const db = c.get("db");
 
     const now = new Date();
-    await db
-      .update(groupInvitation)
-      .set({ revokedAt: now })
-      .where(and(eq(groupInvitation.groupId, member.groupId), isNull(groupInvitation.revokedAt)));
-
     const token = generateInvitationToken();
     const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS);
-    await db.insert(groupInvitation).values({
-      token,
-      groupId: member.groupId,
-      invitedBy: user.id,
-      expiresAt,
-    });
+    await db.batch([
+      db
+        .update(groupInvitation)
+        .set({ revokedAt: now })
+        .where(and(eq(groupInvitation.groupId, member.groupId), isNull(groupInvitation.revokedAt))),
+      db.insert(groupInvitation).values({
+        token,
+        groupId: member.groupId,
+        invitedBy: user.id,
+        expiresAt,
+      }),
+    ]);
 
     return c.json({ token, expiresAt: expiresAt.toISOString() }, 201);
   })

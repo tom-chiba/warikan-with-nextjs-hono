@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
@@ -11,6 +11,7 @@ export default function GroupPage() {
   const params = useParams<{ groupId: string }>();
   const groupId = params.groupId;
   const { data: session, isPending } = useSession();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -26,6 +27,19 @@ export default function GroupPage() {
       });
       if (!res.ok) {
         throw new Error("招待リンクの取得に失敗しました");
+      }
+      return res.json();
+    },
+  });
+
+  // メンバー一覧を取得する。
+  const { data: membersData } = useQuery({
+    queryKey: ["members", groupId],
+    enabled: !!session,
+    queryFn: async () => {
+      const res = await apiClient.groups[":groupId"].members.$get({ param: { groupId } });
+      if (!res.ok) {
+        throw new Error("メンバー一覧の取得に失敗しました");
       }
       return res.json();
     },
@@ -55,6 +69,10 @@ export default function GroupPage() {
     invitation && typeof window !== "undefined"
       ? `${window.location.origin}/invite/${invitation.token}`
       : null;
+
+  const members = membersData?.members ?? [];
+  const currentUserId = session.user.id;
+  const isOwner = members.some((m) => m.userId === currentUserId && m.role === "owner");
 
   async function handleGenerate() {
     setError(null);
@@ -102,6 +120,41 @@ export default function GroupPage() {
     }
   }
 
+  async function handleRemove(userId: string, isSelf: boolean, name: string) {
+    // 退出・削除は取り消せない破壊的操作なので確認を挟む。
+    // 自分が最後の 1 人なら退出でグループ本体（と関連データ）が消えるため、その旨を明示する。
+    const isLastMember = isSelf && members.length === 1;
+    const message = isLastMember
+      ? "あなたが退出するとこのグループは削除されます。よろしいですか？"
+      : isSelf
+        ? "このグループから退出しますか？"
+        : `「${name}」をグループから削除しますか？`;
+    if (!window.confirm(message)) {
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await apiClient.groups[":groupId"].members[":userId"].$delete({
+        param: { groupId, userId },
+      });
+      if (!res.ok) {
+        throw new Error(isSelf ? "退出に失敗しました" : "メンバーの削除に失敗しました");
+      }
+      if (isSelf) {
+        // 退出したらこのグループの画面には留まれないため一覧へ戻る。
+        await queryClient.invalidateQueries({ queryKey: ["groups"] });
+        router.push("/groups");
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["members", groupId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "操作に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center gap-8 p-8">
       <h1 className="text-2xl font-semibold">グループ</h1>
@@ -109,14 +162,16 @@ export default function GroupPage() {
         グループ ID: <span className="font-mono">{groupId}</span>
       </p>
 
+      {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
+      {(error || fetchError) && (
+        <p className="w-full max-w-md text-sm text-red-500">
+          {error ??
+            (fetchError instanceof Error ? fetchError.message : "招待リンクの取得に失敗しました")}
+        </p>
+      )}
+
       <section className="flex w-full max-w-md flex-col gap-3">
         <h2 className="text-lg font-medium">招待リンク</h2>
-        {(error || fetchError) && (
-          <p className="text-sm text-red-500">
-            {error ??
-              (fetchError instanceof Error ? fetchError.message : "招待リンクの取得に失敗しました")}
-          </p>
-        )}
         {inviteUrl ? (
           <div className="flex flex-col gap-2">
             <p className="text-sm text-zinc-500">
@@ -163,7 +218,49 @@ export default function GroupPage() {
         )}
       </section>
 
-      <p className="text-sm text-zinc-500">メンバー管理は今後の Issue（#13）で実装します。</p>
+      <section className="flex w-full max-w-md flex-col gap-3">
+        <h2 className="text-lg font-medium">メンバー</h2>
+        {members.length === 0 ? (
+          <p className="text-sm text-zinc-500">読み込み中…</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {members.map((m) => {
+              const isSelf = m.userId === currentUserId;
+              const canRemove = isSelf || isOwner;
+              return (
+                <li
+                  key={m.userId}
+                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                >
+                  <span className="flex flex-col">
+                    <span>
+                      {m.name}
+                      {isSelf && <span className="text-xs text-zinc-500">（あなた）</span>}
+                    </span>
+                    <span className="text-xs text-zinc-500">{m.email}</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-500">
+                      {m.role === "owner" ? "オーナー" : "メンバー"}
+                    </span>
+                    {canRemove && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => handleRemove(m.userId, isSelf, m.name)}
+                        className="rounded-md border px-3 py-1 text-sm text-red-600 disabled:opacity-50"
+                      >
+                        {isSelf ? "退出" : "削除"}
+                      </button>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
       <Link href="/groups" className="rounded-md border px-4 py-2">
         グループ一覧へ
       </Link>
