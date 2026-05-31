@@ -36,12 +36,13 @@ export const groupsCollection = new Hono<{
 
     // 自分が所属するグループだけを返す。group_member を起点に join し、
     // オーナー不在などのゴミデータ（group 単独行）を拾わないようにする（ADR-0010）。
+    // joinedAt が同値（短時間に複数作成）でも順序が一意に定まるよう group.id をタイブレークに足す。
     const groups = await db
       .select({ id: group.id, name: group.name, role: groupMember.role })
       .from(groupMember)
       .innerJoin(group, eq(groupMember.groupId, group.id))
       .where(eq(groupMember.userId, user.id))
-      .orderBy(groupMember.joinedAt);
+      .orderBy(groupMember.joinedAt, group.id);
 
     return c.json({ groups });
   });

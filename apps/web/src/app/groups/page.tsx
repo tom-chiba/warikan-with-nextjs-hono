@@ -17,7 +17,11 @@ export default function GroupsPage() {
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
-  const { data: groupsData, isPending: groupsLoading } = useQuery({
+  const {
+    data: groupsData,
+    isPending: groupsLoading,
+    isError: groupsError,
+  } = useQuery({
     queryKey: ["groups"],
     enabled: !!session,
     queryFn: async () => {
@@ -76,7 +80,8 @@ export default function GroupsPage() {
       <section className="flex w-full max-w-xs flex-col gap-3">
         <h2 className="text-lg font-medium">所属グループ</h2>
         {groupsLoading && <p className="text-zinc-500">読み込み中…</p>}
-        {!groupsLoading && groups.length === 0 && (
+        {groupsError && <p className="text-sm text-red-500">グループ一覧の取得に失敗しました。</p>}
+        {!groupsLoading && !groupsError && groups.length === 0 && (
           <p className="text-sm text-zinc-500">
             まだグループがありません。下のフォームから作成しましょう。
           </p>
