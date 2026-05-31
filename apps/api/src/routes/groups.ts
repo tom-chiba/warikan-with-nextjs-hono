@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, notExists } from "drizzle-orm";
 import { Hono } from "hono";
 import type { DbVariables, GroupMemberVariables } from "../context";
 import { group, groupInvitation, groupMember, user } from "../db/schema";
@@ -49,26 +49,35 @@ export const groups = new Hono<{
       return c.json({ error: "Forbidden" }, 403);
     }
 
-    const deleted = await db
-      .delete(groupMember)
-      .where(and(eq(groupMember.groupId, caller.groupId), eq(groupMember.userId, targetUserId)))
-      .returning({ userId: groupMember.userId });
+    // メンバー削除と「最後の 1 人なら group も削除」を 1 つの batch（D1 の暗黙の SQL トランザクション
+    // ＝ all-or-nothing）で原子的に行う。group 削除はメンバー削除後の残数に依存するため、その条件を
+    // NOT EXISTS サブクエリで SQL 内に閉じ込め、batch 内の逐次実行（2 文目は 1 文目の削除を観測する）
+    // に委ねる。これにより「メンバーだけ消えて group 削除が漏れる」中間状態が発生しない。
+    // group 削除時の関連データ（invitation 等）は外部キー CASCADE で消える。
+    // D1 は対話的トランザクション（db.transaction()）非対応のため batch を用いる（groups-collection と同方針）。
+    const [deleted, deletedGroup] = await db.batch([
+      db
+        .delete(groupMember)
+        .where(and(eq(groupMember.groupId, caller.groupId), eq(groupMember.userId, targetUserId)))
+        .returning({ userId: groupMember.userId }),
+      db
+        .delete(group)
+        .where(
+          and(
+            eq(group.id, caller.groupId),
+            notExists(db.select().from(groupMember).where(eq(groupMember.groupId, caller.groupId))),
+          ),
+        )
+        .returning({ id: group.id }),
+    ]);
+
+    // 対象メンバーが存在しなければ削除は 0 件（404）。このとき呼び出し元は必ずメンバーとして残る
+    // ため group も削除されず、batch は無害（何も変更しない）。
     if (deleted.length === 0) {
       return c.json({ error: "Not Found" }, 404);
     }
 
-    // 残りメンバーが 0 ならグループを削除する（最後の 1 人の退出）。
-    const remaining = await db
-      .select({ userId: groupMember.userId })
-      .from(groupMember)
-      .where(eq(groupMember.groupId, caller.groupId))
-      .all();
-    const groupDeleted = remaining.length === 0;
-    if (groupDeleted) {
-      await db.delete(group).where(eq(group.id, caller.groupId));
-    }
-
-    return c.json({ removed: true, groupDeleted });
+    return c.json({ removed: true, groupDeleted: deletedGroup.length > 0 });
   })
   // 招待リンクを発行する（メンバーなら誰でも可）。
   // グループごとに有効リンクは原則 1 本にするため、既存の未失効トークンを失効させてから新規発行する。
