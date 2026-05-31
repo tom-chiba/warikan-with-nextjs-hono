@@ -1,7 +1,8 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-const BASE = "http://localhost:8787";
+// API のオリジンは vitest.config.ts の miniflare bindings(BETTER_AUTH_URL) を単一ソースとする。
+const BASE = env.BETTER_AUTH_URL;
 
 describe("RPC ルート", () => {
   it("GET / は API メッセージを返す", async () => {

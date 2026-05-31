@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createAuth } from "./auth";
+import { requireAuth } from "./middleware/require-auth";
+import { requireGroupMember } from "./middleware/require-group-member";
 import { routes } from "./rpc";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -21,6 +23,11 @@ app.use("*", (c, next) =>
 // Better Auth のハンドラ（catch-all のため型付き RPC クライアントには含めない。
 // フロントエンドは better-auth のクライアントから利用する）。
 app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw));
+
+// グループ配下の保護ルートに認可ミドルウェアを適用する。
+// Env/DB/auth に依存する処理は Bindings を持つ index.ts 側に集約し、
+// rpc.ts / routes は Workers 固有型に依存させない。route 登録より前に置く必要がある。
+app.use("/groups/:groupId/*", requireAuth(), requireGroupMember());
 
 // 型安全な RPC ルートをマウントする。型は ./rpc の AppType として公開する。
 app.route("/", routes);

@@ -29,6 +29,9 @@ export default defineConfig(async () => {
     ],
     test: {
       setupFiles: ["./test/apply-migrations.ts"],
+      // Better Auth のパスワードハッシュ(scrypt)は Miniflare 上で重く、
+      // デフォルトの 5s timeout を超えることがあるため引き上げる。
+      testTimeout: 30_000,
     },
   };
 });

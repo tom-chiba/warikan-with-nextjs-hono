@@ -22,3 +22,4 @@
 | 0006 | [D1 へのアクセスに Drizzle ORM を採用](./0006-orm-drizzle-d1.md)            | accepted |
 | 0007 | [認証に Better Auth を採用](./0007-auth-better-auth.md)                     | accepted |
 | 0008 | [テスト戦略](./0008-testing-strategy.md)                                    | accepted |
+| 0009 | [グループ単位の認可レイヤの構成](./0009-group-authorization-layer.md)       | accepted |
