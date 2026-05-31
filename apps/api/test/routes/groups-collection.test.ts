@@ -84,3 +84,52 @@ describe("POST /groups（グループ作成）", () => {
     expect(row).toBeNull();
   });
 });
+
+// API 経由でグループを作成して id を返すヘルパー。
+async function createGroup(cookie: string, name: string): Promise<string> {
+  const res = await SELF.fetch(`${BASE}/groups`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ name }),
+  });
+  const body = (await res.json()) as { id: string };
+  return body.id;
+}
+
+describe("GET /groups（所属グループ一覧）", () => {
+  it("自分が所属するグループだけを role 付きで返す", async () => {
+    const meCookie = await signUpAndGetCookie("owner-list@example.com");
+    const otherCookie = await signUpAndGetCookie("other-list@example.com");
+
+    const g1 = await createGroup(meCookie, "旅行");
+    const g2 = await createGroup(meCookie, "飲み会");
+    await createGroup(otherCookie, "他人のグループ");
+
+    const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie: meCookie } });
+
+    expect(res.status).toBe(200);
+    const { groups } = (await res.json()) as {
+      groups: { id: string; name: string; role: string }[];
+    };
+
+    // 自分のグループ 2 件のみ。他人のグループは含まれない。
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.id).sort()).toEqual([g1, g2].sort());
+    expect(groups.every((g) => g.role === "owner")).toBe(true);
+    expect(groups.map((g) => g.name)).not.toContain("他人のグループ");
+  });
+
+  it("所属が 0 件なら空配列を返す", async () => {
+    const cookie = await signUpAndGetCookie("empty-list@example.com");
+
+    const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ groups: [] });
+  });
+
+  it("未ログインなら 401", async () => {
+    const res = await SELF.fetch(`${BASE}/groups`);
+    expect(res.status).toBe(401);
+  });
+});
