@@ -16,7 +16,7 @@ app.use("*", (c, next) =>
   cors({
     origin: (c.env.WEB_ORIGIN ?? "http://localhost:3000").split(","),
     allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
     credentials: true,
   })(c, next),
 );
@@ -33,7 +33,8 @@ app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.ra
 // db を使うため provideDb も適用する（:groupId を伴わないため requireGroupMember は掛けない）。
 app.use("/groups", requireAuth(), provideDb());
 // member 限定（/groups/:groupId/*）はログイン + 当該グループ所属を要求する。
-app.use("/groups/:groupId/*", requireAuth(), requireGroupMember());
+// ハンドラが db を使うため provideDb も適用する（順序: 認証 → db 注入 → メンバー確認）。
+app.use("/groups/:groupId/*", requireAuth(), provideDb(), requireGroupMember());
 
 // 型安全な RPC ルートをマウントする。型は ./rpc の AppType として公開する。
 app.route("/", routes);

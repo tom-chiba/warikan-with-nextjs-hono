@@ -1,21 +1,166 @@
 "use client";
 
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
+import { apiClient } from "@/lib/api-client";
+import { useSession } from "@/lib/auth-client";
 
-// グループページのプレースホルダ。メンバー管理・招待リンク発行は後続 Issue（#11, #13）で実装する。
 export default function GroupPage() {
   const params = useParams<{ groupId: string }>();
+  const groupId = params.groupId;
+  const { data: session, isPending } = useSession();
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 現在有効な招待リンク（未失効・期限内）を取得する。
+  const { data: inviteData } = useQuery({
+    queryKey: ["invitation", groupId],
+    enabled: !!session,
+    queryFn: async () => {
+      const res = await apiClient.groups[":groupId"].invitations.active.$get({
+        param: { groupId },
+      });
+      if (!res.ok) {
+        throw new Error("招待リンクの取得に失敗しました");
+      }
+      return res.json();
+    },
+  });
+
+  if (isPending) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <p className="text-zinc-500">セッション確認中…</p>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+        <p>このページを利用するにはサインインが必要です。</p>
+        <Link href="/" className="rounded-md border px-4 py-2">
+          サインインへ
+        </Link>
+      </main>
+    );
+  }
+
+  const invitation = inviteData?.invitation ?? null;
+  const inviteUrl =
+    invitation && typeof window !== "undefined"
+      ? `${window.location.origin}/invite/${invitation.token}`
+      : null;
+
+  async function handleGenerate() {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await apiClient.groups[":groupId"].invitations.$post({ param: { groupId } });
+      if (!res.ok) {
+        throw new Error("招待リンクの発行に失敗しました");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["invitation", groupId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "招待リンクの発行に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRevoke(token: string) {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await apiClient.groups[":groupId"].invitations[":token"].$delete({
+        param: { groupId, token },
+      });
+      if (!res.ok) {
+        throw new Error("招待リンクの無効化に失敗しました");
+      }
+      await queryClient.invalidateQueries({ queryKey: ["invitation", groupId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "招待リンクの無効化に失敗しました");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCopy(url: string) {
+    setError(null);
+    try {
+      // クリップボード API は非安全オリジンや権限拒否で reject されうるため捕捉する。
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("コピーに失敗しました。リンクを手動で選択してコピーしてください。");
+    }
+  }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+    <main className="flex flex-1 flex-col items-center gap-8 p-8">
       <h1 className="text-2xl font-semibold">グループ</h1>
-      <p>
-        グループ ID: <span className="font-mono">{params.groupId}</span>
+      <p className="text-sm text-zinc-500">
+        グループ ID: <span className="font-mono">{groupId}</span>
       </p>
-      <p className="text-sm text-zinc-500">メンバー管理・招待リンクは今後の Issue で実装します。</p>
+
+      <section className="flex w-full max-w-md flex-col gap-3">
+        <h2 className="text-lg font-medium">招待リンク</h2>
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        {inviteUrl ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-sm text-zinc-500">
+              このリンクを共有するとメンバーを招待できます（有効期限あり）。
+            </p>
+            <code className="break-all rounded-md border bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-900">
+              {inviteUrl}
+            </code>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => handleCopy(inviteUrl)}
+                className="rounded-md border px-4 py-2"
+              >
+                {copied ? "コピーしました" : "コピー"}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => invitation && handleRevoke(invitation.token)}
+                className="rounded-md border px-4 py-2 text-red-600 disabled:opacity-50"
+              >
+                無効化
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleGenerate}
+                className="rounded-md border px-4 py-2 disabled:opacity-50"
+              >
+                再発行
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={handleGenerate}
+            className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          >
+            招待リンクを発行
+          </button>
+        )}
+      </section>
+
+      <p className="text-sm text-zinc-500">メンバー管理は今後の Issue（#13）で実装します。</p>
       <Link href="/groups" className="rounded-md border px-4 py-2">
-        グループを作成
+        グループ一覧へ
       </Link>
     </main>
   );

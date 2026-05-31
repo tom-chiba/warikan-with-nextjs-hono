@@ -105,6 +105,25 @@ export const groupMember = sqliteTable(
   (t) => [primaryKey({ columns: [t.groupId, t.userId] })],
 );
 
+// グループ招待リンク。トークン付き URL でメンバーを集める。
+// token は推測困難なランダム文字列を主キーとする。期限内かつ未失効（revokedAt IS NULL）なら有効。
+// グループごとに有効リンクは原則 1 本（再発行時に既存の有効トークンを失効させる）。
+export const groupInvitation = sqliteTable("group_invitation", {
+  token: text("token").primaryKey(),
+  groupId: text("group_id")
+    .notNull()
+    .references(() => group.id, { onDelete: "cascade" }),
+  // 発行者（監査用メタ情報）。発行者がアカウント削除されても、グループに残る他メンバーが
+  // 共有中のリンクを生かし続けられるよう、CASCADE ではなく SET NULL とする（nullable）。
+  invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  // 無効化時刻。null なら未失効。明示的な無効化・再発行時にこの列を打つ。
+  revokedAt: integer("revoked_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+
 // 購入品。status は未精算/精算済の 2 状態。
 export const item = sqliteTable("item", {
   id: text("id")
