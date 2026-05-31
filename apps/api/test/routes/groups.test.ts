@@ -20,7 +20,7 @@ async function joinGroup(groupId: string, userId: string, role = "member") {
 }
 
 describe("保護ルート /groups/:groupId", () => {
-  it("メンバーのリクエストは通過し group コンテキストを参照できる", async () => {
+  it("メンバーのリクエストは通過し、メンバー一覧を取得できる", async () => {
     const cookie = await signUpAndGetCookie("member@example.com");
     const userId = await getUserId(env.DB, "member@example.com");
     await joinGroup("group-pass", userId, "owner");
@@ -30,7 +30,15 @@ describe("保護ルート /groups/:groupId", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ groupId: "group-pass", role: "owner" });
+    const { members } = (await res.json()) as {
+      members: { userId: string; email: string; role: string }[];
+    };
+    expect(members).toHaveLength(1);
+    expect(members[0]).toMatchObject({
+      userId,
+      email: "member@example.com",
+      role: "owner",
+    });
   });
 
   it("別グループのメンバーが所属しないグループにアクセスすると 403 を返す", async () => {

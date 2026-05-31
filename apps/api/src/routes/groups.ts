@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import type { DbVariables, GroupMemberVariables } from "../context";
-import { groupInvitation } from "../db/schema";
+import { group, groupInvitation, groupMember, user } from "../db/schema";
 import { generateInvitationToken } from "../lib/token";
 
 // 招待リンクの有効期限（発行から 7 日間）。
@@ -14,9 +14,61 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const groups = new Hono<{
   Variables: GroupMemberVariables & DbVariables;
 }>()
-  .get("/:groupId/members", (c) => {
+  // グループのメンバー一覧を返す。各メンバーの表示用情報（name/email）と role/joinedAt を含む。
+  .get("/:groupId/members", async (c) => {
     const member = c.get("groupMember");
-    return c.json({ groupId: member.groupId, role: member.role });
+    const db = c.get("db");
+
+    const members = await db
+      .select({
+        userId: groupMember.userId,
+        name: user.name,
+        email: user.email,
+        role: groupMember.role,
+        joinedAt: groupMember.joinedAt,
+      })
+      .from(groupMember)
+      .innerJoin(user, eq(groupMember.userId, user.id))
+      .where(eq(groupMember.groupId, member.groupId))
+      .orderBy(groupMember.joinedAt);
+
+    return c.json({
+      members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })),
+    });
+  })
+  // メンバーを削除（他者削除）または退出（自分の削除）する。
+  // 自分自身は常に退出可。他メンバーの削除は owner のみ可。
+  // 最後の 1 人が抜けた場合はグループ自体も削除する（関連データは CASCADE で消える）。
+  .delete("/:groupId/members/:userId", async (c) => {
+    const caller = c.get("groupMember");
+    const targetUserId = c.req.param("userId");
+    const db = c.get("db");
+
+    const isSelf = targetUserId === caller.userId;
+    if (!isSelf && caller.role !== "owner") {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const deleted = await db
+      .delete(groupMember)
+      .where(and(eq(groupMember.groupId, caller.groupId), eq(groupMember.userId, targetUserId)))
+      .returning({ userId: groupMember.userId });
+    if (deleted.length === 0) {
+      return c.json({ error: "Not Found" }, 404);
+    }
+
+    // 残りメンバーが 0 ならグループを削除する（最後の 1 人の退出）。
+    const remaining = await db
+      .select({ userId: groupMember.userId })
+      .from(groupMember)
+      .where(eq(groupMember.groupId, caller.groupId))
+      .all();
+    const groupDeleted = remaining.length === 0;
+    if (groupDeleted) {
+      await db.delete(group).where(eq(group.id, caller.groupId));
+    }
+
+    return c.json({ removed: true, groupDeleted });
   })
   // 招待リンクを発行する（メンバーなら誰でも可）。
   // グループごとに有効リンクは原則 1 本にするため、既存の未失効トークンを失効させてから新規発行する。
