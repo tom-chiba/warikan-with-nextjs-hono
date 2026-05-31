@@ -12,14 +12,15 @@
 
 ## 一覧
 
-| #    | タイトル                                                                    | Status   |
-| ---- | --------------------------------------------------------------------------- | -------- |
-| 0001 | [モノレポ構成の採用](./0001-monorepo-structure.md)                          | accepted |
-| 0002 | [mise による開発ツールのバージョン管理](./0002-toolchain-mise-pnpm-node.md) | accepted |
-| 0003 | [Lint / Format に Oxc を採用](./0003-lint-format-oxc.md)                    | accepted |
-| 0004 | [pnpm によるサプライチェーン対策](./0004-supply-chain-hardening.md)         | accepted |
-| 0005 | [API 連携に Hono RPC を採用](./0005-api-integration-hono-rpc.md)            | accepted |
-| 0006 | [D1 へのアクセスに Drizzle ORM を採用](./0006-orm-drizzle-d1.md)            | accepted |
-| 0007 | [認証に Better Auth を採用](./0007-auth-better-auth.md)                     | accepted |
-| 0008 | [テスト戦略](./0008-testing-strategy.md)                                    | accepted |
-| 0009 | [グループ単位の認可レイヤの構成](./0009-group-authorization-layer.md)       | accepted |
+| #    | タイトル                                                                                       | Status   |
+| ---- | ---------------------------------------------------------------------------------------------- | -------- |
+| 0001 | [モノレポ構成の採用](./0001-monorepo-structure.md)                                             | accepted |
+| 0002 | [mise による開発ツールのバージョン管理](./0002-toolchain-mise-pnpm-node.md)                    | accepted |
+| 0003 | [Lint / Format に Oxc を採用](./0003-lint-format-oxc.md)                                       | accepted |
+| 0004 | [pnpm によるサプライチェーン対策](./0004-supply-chain-hardening.md)                            | accepted |
+| 0005 | [API 連携に Hono RPC を採用](./0005-api-integration-hono-rpc.md)                               | accepted |
+| 0006 | [D1 へのアクセスに Drizzle ORM を採用](./0006-orm-drizzle-d1.md)                               | accepted |
+| 0007 | [認証に Better Auth を採用](./0007-auth-better-auth.md)                                        | accepted |
+| 0008 | [テスト戦略](./0008-testing-strategy.md)                                                       | accepted |
+| 0009 | [グループ単位の認可レイヤの構成](./0009-group-authorization-layer.md)                          | accepted |
+| 0010 | [ハンドラへの DB 注入とコレクションルートの認可](./0010-db-injection-and-collection-routes.md) | accepted |
