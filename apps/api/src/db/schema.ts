@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Better Auth のコアスキーマ（メール + パスワード）を Drizzle(SQLite/D1) で定義する。
 // プロパティ名は Better Auth のフィールド名（camelCase）に一致させ、
@@ -64,3 +64,95 @@ export const verification = sqliteTable("verification", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
+
+// ── 割勘ドメインスキーマ ──────────────────────────────────────────────
+// id は text 主キー + crypto.randomUUID() を Workers ランタイムで生成する
+//（Better Auth の user 等は自前で id を生成するため $defaultFn を持たないが、
+//  ドメインテーブルは挿入側が id を意識せず済むようデフォルト生成を持たせる）。
+// 金額は整数（円）。timestamp は Unix epoch（integer mode:"timestamp"）。
+
+export const group = sqliteTable("group", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+
+// メンバーは全員アカウント必須（1 メンバー = 1 ユーザー）。userId は user.id を参照する。
+// (groupId, userId) を複合主キーとし、同一グループでの重複所属を防ぐ。
+export const groupMember = sqliteTable(
+  "group_member",
+  {
+    groupId: text("group_id")
+      .notNull()
+      .references(() => group.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["owner", "member"] })
+      .notNull()
+      .default("member"),
+    joinedAt: integer("joined_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.userId] })],
+);
+
+// 購入品。status は未精算/精算済の 2 状態。
+export const item = sqliteTable("item", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  groupId: text("group_id")
+    .notNull()
+    .references(() => group.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  purchasedOn: integer("purchased_on", { mode: "timestamp" }),
+  memo: text("memo"),
+  status: text("status", { enum: ["unsettled", "settled"] })
+    .notNull()
+    .default("unsettled"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .$defaultFn(() => new Date())
+    .notNull(),
+});
+
+// 各メンバーが実際に支払った額。(itemId, userId) で一意。
+export const itemPayment = sqliteTable(
+  "item_payment",
+  {
+    itemId: text("item_id")
+      .notNull()
+      .references(() => item.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.userId] })],
+);
+
+// 各メンバーが負担すべき額（割勘金額）。(itemId, userId) で一意。
+export const itemShare = sqliteTable(
+  "item_share",
+  {
+    itemId: text("item_id")
+      .notNull()
+      .references(() => item.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.userId] })],
+);
