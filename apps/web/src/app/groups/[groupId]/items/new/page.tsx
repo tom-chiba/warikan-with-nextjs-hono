@@ -8,10 +8,12 @@ import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { distributeEqually } from "@/lib/split";
 
-// 入力欄の文字列を金額（非負整数）に変換する。未入力・不正値・負数は 0 とみなす。
+// 入力欄の文字列を金額（正の整数・円）に変換する。未入力・小数・負数・0・非数値は 0 とみなす。
+// type="number" は "1e2"（=100）等の指数表記を有効値として返すため、parseInt ではなく Number で
+// 数値全体を解釈する（parseInt だと "1e2" を 1 と誤読する）。小数は Number.isInteger で弾く。
 function parseAmount(value: string | undefined): number {
-  const n = Number.parseInt(value ?? "", 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const n = Number(value ?? "");
+  return Number.isInteger(n) && n > 0 ? n : 0;
 }
 
 // userId → 金額(円) の集計。

@@ -67,20 +67,20 @@ export const items = new Hono<{
   // D1 は対話的トランザクション（db.transaction()）非対応のため batch を用いる（groups-collection と同方針）。
   // 合計 > 0 を満たすため payments / shares はいずれも 1 件以上で、空配列 insert にはならない。
   const id = crypto.randomUUID();
+  const toRows = (entries: { userId: string; amount: number }[]) =>
+    entries.map((e) => ({ itemId: id, ...e }));
   await db.batch([
     db.insert(item).values({
       id,
       groupId: member.groupId,
       name,
+      // "YYYY-MM-DD" を UTC 0 時として保存する（Workers は UTC 固定で保存・読出が一貫する）。
+      // 表示時は UTC で日付部分を取り出すこと（ローカルTZ で解釈すると前日に見える端末が出る）。
       purchasedOn: purchasedOn ? new Date(purchasedOn) : null,
       memo: memo ?? null,
     }),
-    db
-      .insert(itemPayment)
-      .values(payments.map((p) => ({ itemId: id, userId: p.userId, amount: p.amount }))),
-    db
-      .insert(itemShare)
-      .values(shares.map((s) => ({ itemId: id, userId: s.userId, amount: s.amount }))),
+    db.insert(itemPayment).values(toRows(payments)),
+    db.insert(itemShare).values(toRows(shares)),
   ]);
 
   return c.json({ id }, 201);

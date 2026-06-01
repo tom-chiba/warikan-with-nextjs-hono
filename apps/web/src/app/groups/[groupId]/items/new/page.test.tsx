@@ -145,6 +145,23 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
   expect(screen.getByLabelText("購入品名")).toHaveValue("");
 });
 
+test("保存時に 401 が返るとセッション切れメッセージを表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  itemsPostMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+  renderWithClient(<NewItemPage />);
+
+  await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
+  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(
+    await screen.findByText("セッションが切れました。再度サインインしてください。"),
+  ).toBeInTheDocument();
+});
+
 test("合計が一致しないと保存ボタンは無効", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   setTwoMembers();

@@ -80,7 +80,8 @@ describe("POST /groups/:groupId/items（購入品の保存）", () => {
     expect(item?.name).toBe("ランチ");
     expect(item?.memo).toBe("駅前の店");
     expect(item?.status).toBe("unsettled");
-    expect(item?.purchased_on).not.toBeNull();
+    // "YYYY-MM-DD" は UTC 0 時の Unix 秒として保存される（mode:"timestamp"）。
+    expect(item?.purchased_on).toBe(new Date("2026-06-01").getTime() / 1000);
 
     expect(await countRows("item_payment", id)).toBe(1);
     expect(await countRows("item_share", id)).toBe(2);
