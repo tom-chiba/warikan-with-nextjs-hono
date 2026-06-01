@@ -136,6 +136,19 @@ test("精算するとボタンで選択 id が settlements に送られる", asy
   });
 });
 
+test("精算が 0 件更新だったら警告を表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+  settleMock.mockResolvedValue({ ok: true, json: async () => ({ settled: [] }) });
+
+  renderWithClient(<UnsettledItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
+
+  expect(await screen.findByText(/精算対象がありませんでした/)).toBeInTheDocument();
+});
+
 test("削除ボタンで該当アイテムの DELETE が呼ばれる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });

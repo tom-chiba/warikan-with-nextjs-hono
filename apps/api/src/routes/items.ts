@@ -180,14 +180,17 @@ export const items = new Hono<{
       return c.json({ error: "Not Found" }, 404);
     }
 
-    const payments = await db
-      .select({ userId: itemPayment.userId, amount: itemPayment.amount })
-      .from(itemPayment)
-      .where(eq(itemPayment.itemId, itemId));
-    const shares = await db
-      .select({ userId: itemShare.userId, amount: itemShare.amount })
-      .from(itemShare)
-      .where(eq(itemShare.itemId, itemId));
+    // payments / shares は互いに依存しないため並行取得して 1 往復分のレイテンシを削る。
+    const [payments, shares] = await Promise.all([
+      db
+        .select({ userId: itemPayment.userId, amount: itemPayment.amount })
+        .from(itemPayment)
+        .where(eq(itemPayment.itemId, itemId)),
+      db
+        .select({ userId: itemShare.userId, amount: itemShare.amount })
+        .from(itemShare)
+        .where(eq(itemShare.itemId, itemId)),
+    ]);
 
     return c.json({
       item: {
@@ -245,7 +248,9 @@ export const items = new Hono<{
           memo: memo ?? null,
           updatedAt: new Date(),
         })
-        .where(eq(item.id, itemId)),
+        // 存在確認(existing)と batch の間に settled 化された場合に精算済を上書きしないよう、
+        // 更新条件にも status = "unsettled" を含めて防御する（TOCTOU 対策）。
+        .where(and(eq(item.id, itemId), eq(item.status, "unsettled"))),
       db.delete(itemPayment).where(eq(itemPayment.itemId, itemId)),
       db.delete(itemShare).where(eq(itemShare.itemId, itemId)),
       db.insert(itemPayment).values(makeRows(itemId, payments)),

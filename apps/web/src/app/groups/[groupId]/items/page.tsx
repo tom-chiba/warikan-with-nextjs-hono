@@ -116,6 +116,12 @@ export default function UnsettledItemsPage() {
       if (!res.ok) {
         throw new Error("精算に失敗しました");
       }
+      // サーバは groupId 一致かつ未精算の id のみ更新する。0 件なら（既に精算済・削除済等で）
+      // 実質何も変わっていないため、成功表示せず警告する。
+      const { settled } = await res.json();
+      if (settled.length === 0) {
+        throw new Error("精算対象がありませんでした（既に精算済みか削除済みの可能性があります）");
+      }
       setSelected(new Set());
       await queryClient.invalidateQueries({ queryKey: ["items", groupId, "unsettled"] });
     } catch (err) {

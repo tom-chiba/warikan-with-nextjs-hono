@@ -113,3 +113,19 @@ test("更新すると PUT が呼ばれ、一覧へ遷移する", async () => {
     expect(pushMock).toHaveBeenCalledWith("/groups/g1/items");
   });
 });
+
+test("精算済アイテムは編集できず、フォームは表示されない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ item: { ...item.item, status: "settled" } }),
+  });
+  membersGetMock.mockResolvedValue({ ok: true, json: async () => members });
+
+  renderWithClient(<EditItemPage />);
+
+  expect(
+    await screen.findByText("このアイテムは精算済みのため編集できません。"),
+  ).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "更新" })).not.toBeInTheDocument();
+});
