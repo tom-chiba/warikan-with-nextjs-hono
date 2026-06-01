@@ -4,8 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
+import { useGroupMembers } from "@/lib/use-group-members";
 
 export default function GroupPage() {
   const params = useParams<{ groupId: string }>();
@@ -33,35 +35,14 @@ export default function GroupPage() {
   });
 
   // メンバー一覧を取得する。
-  const { data: membersData } = useQuery({
-    queryKey: ["members", groupId],
-    enabled: !!session,
-    queryFn: async () => {
-      const res = await apiClient.groups[":groupId"].members.$get({ param: { groupId } });
-      if (!res.ok) {
-        throw new Error("メンバー一覧の取得に失敗しました");
-      }
-      return res.json();
-    },
-  });
+  const { data: membersData } = useGroupMembers(groupId, !!session);
 
   if (isPending) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-        <p className="text-zinc-500">セッション確認中…</p>
-      </main>
-    );
+    return <SessionPending />;
   }
 
   if (!session) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-        <p>このページを利用するにはサインインが必要です。</p>
-        <Link href="/" className="rounded-md border px-4 py-2">
-          サインインへ
-        </Link>
-      </main>
-    );
+    return <SignInPrompt />;
   }
 
   const invitation = inviteData?.invitation ?? null;
@@ -162,12 +143,17 @@ export default function GroupPage() {
         グループ ID: <span className="font-mono">{groupId}</span>
       </p>
 
-      <Link
-        href={`/groups/${groupId}/items/new`}
-        className="rounded-md bg-black px-4 py-2 text-white dark:bg-white dark:text-black"
-      >
-        購入品を入力
-      </Link>
+      <div className="flex gap-2">
+        <Link
+          href={`/groups/${groupId}/items/new`}
+          className="rounded-md bg-black px-4 py-2 text-white dark:bg-white dark:text-black"
+        >
+          購入品を入力
+        </Link>
+        <Link href={`/groups/${groupId}/items`} className="rounded-md border px-4 py-2">
+          未精算一覧
+        </Link>
+      </div>
 
       {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
       {(error || fetchError) && (

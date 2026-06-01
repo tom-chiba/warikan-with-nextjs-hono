@@ -1,0 +1,304 @@
+"use client";
+
+import { type FormEvent, useState } from "react";
+import { distributeEqually } from "@/lib/split";
+
+// 購入品の入力フォーム（新規 #4 / 編集 #20 で共通利用）。
+// 支払額・割勘金額の入力、等分、「残りをここに」、合計・過不足表示、保存可否の判定を内包する。
+// 保存処理そのもの（POST / PUT・遷移）は onSubmit に委ね、本コンポーネントは入力と検証に専念する。
+
+export type Member = { userId: string; name: string };
+
+// onSubmit に渡す正規化済みの値。payments / shares は金額 > 0 の行だけを含む。
+export type ItemFormValues = {
+  name: string;
+  purchasedOn: string | null;
+  memo: string | null;
+  payments: { userId: string; amount: number }[];
+  shares: { userId: string; amount: number }[];
+};
+
+// プリフィル用の初期値。金額は入力欄に合わせて userId → 文字列で持つ。
+export type ItemFormInitial = {
+  name: string;
+  purchasedOn: string;
+  memo: string;
+  payments: Record<string, string>;
+  shares: Record<string, string>;
+};
+
+type ItemFormProps = {
+  members: Member[];
+  initial?: ItemFormInitial;
+  submitLabel: string;
+  // 成功後にフォームを初期化して同じ画面に留まるか（新規の連続入力 = true、編集 = false）。
+  resetAfterSubmit?: boolean;
+  // 成功時に表示するメッセージ（任意）。
+  successMessage?: string;
+  onSubmit: (values: ItemFormValues) => Promise<void>;
+};
+
+// 入力欄の文字列を金額（正の整数・円）に変換する。未入力・小数・負数・0・非数値は 0 とみなす。
+// type="number" は "1e2"（=100）等の指数表記を有効値として返すため、parseInt ではなく Number で
+// 数値全体を解釈する（parseInt だと "1e2" を 1 と誤読する）。小数は Number.isInteger で弾く。
+function parseAmount(value: string | undefined): number {
+  const n = Number(value ?? "");
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+// userId → 金額(円) の集計。
+function totalOf(amounts: Record<string, string>, userIds: string[]): number {
+  return userIds.reduce((sum, userId) => sum + parseAmount(amounts[userId]), 0);
+}
+
+const EMPTY: Record<string, string> = {};
+
+export function ItemForm({
+  members,
+  initial,
+  submitLabel,
+  resetAfterSubmit = false,
+  successMessage,
+  onSubmit,
+}: ItemFormProps) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [purchasedOn, setPurchasedOn] = useState(initial?.purchasedOn ?? "");
+  const [memo, setMemo] = useState(initial?.memo ?? "");
+  // 入力中の値は文字列で保持する（空欄と 0 を区別し、IME や前ゼロ等の編集を妨げない）。
+  const [payments, setPayments] = useState<Record<string, string>>(initial?.payments ?? EMPTY);
+  const [shares, setShares] = useState<Record<string, string>>(initial?.shares ?? EMPTY);
+  const [equalSplit, setEqualSplit] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const memberIds = members.map((m) => m.userId);
+  const paymentTotal = totalOf(payments, memberIds);
+  const shareTotal = totalOf(shares, memberIds);
+  const deficit = paymentTotal - shareTotal;
+
+  // 等分の割勘金額を計算して shares に反映する。端数のランダム振り分け結果はこの呼び出し時点で
+  // 確定し、以降は state に保持されて再描画では変わらない（等分 ON 化・支払額変更などの操作時のみ
+  // 再計算する。effect ではなくイベントで行うことで余分な再レンダーと依存追従ロジックを避ける）。
+  function applyEqualSplit(paymentsForCalc: Record<string, string>) {
+    const distributed = distributeEqually(totalOf(paymentsForCalc, memberIds), memberIds);
+    setShares(
+      Object.fromEntries(Object.entries(distributed).map(([id, amount]) => [id, String(amount)])),
+    );
+  }
+
+  // 支払額を変更する。等分 ON のときは新しい支払額合計で割勘を再計算して追従させる。
+  function handlePaymentChange(userId: string, value: string) {
+    setSaved(false);
+    const next = { ...payments, [userId]: value };
+    setPayments(next);
+    if (equalSplit) {
+      applyEqualSplit(next);
+    }
+  }
+
+  // 割勘金額の手入力。等分の自動入力を上書きする意思表示とみなし、等分スイッチを OFF にする。
+  function handleShareChange(userId: string, value: string) {
+    setSaved(false);
+    setEqualSplit(false);
+    setShares((prev) => ({ ...prev, [userId]: value }));
+  }
+
+  // 「残りをここに」: 不足分（支払額合計 − 現在の割勘金額合計）を対象メンバーへ加算する。
+  // 手動調整なので等分スイッチは OFF にする。結果が負になる場合は 0 で止める。
+  function handleFillRemainder(userId: string) {
+    if (deficit === 0) {
+      return;
+    }
+    setSaved(false);
+    setEqualSplit(false);
+    setShares((prev) => {
+      const next = Math.max(0, parseAmount(prev[userId]) + deficit);
+      return { ...prev, [userId]: String(next) };
+    });
+  }
+
+  const nameValid = name.trim().length > 0;
+  // 保存可能条件: 品名あり・支払額合計 > 0・支払額合計 = 割勘金額合計。
+  const canSubmit = nameValid && paymentTotal > 0 && paymentTotal === shareTotal;
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSaved(false);
+    setSubmitting(true);
+    try {
+      // 金額 > 0 のメンバー行だけ送る（0 円は保存しない仕様）。
+      const toEntries = (amounts: Record<string, string>) =>
+        memberIds
+          .map((userId) => ({ userId, amount: parseAmount(amounts[userId]) }))
+          .filter((entry) => entry.amount > 0);
+
+      await onSubmit({
+        name: name.trim(),
+        purchasedOn: purchasedOn || null,
+        memo: memo.trim() || null,
+        payments: toEntries(payments),
+        shares: toEntries(shares),
+      });
+
+      if (resetAfterSubmit) {
+        setName("");
+        setPurchasedOn("");
+        setMemo("");
+        setPayments(EMPTY);
+        setShares(EMPTY);
+        setEqualSplit(false);
+      }
+      setSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存に失敗しました");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-6">
+      <section className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium">購入品名</span>
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(e) => {
+              setSaved(false);
+              setName(e.target.value);
+            }}
+            placeholder="例: ランチ"
+            className="rounded-md border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium">購入日（任意）</span>
+          <input
+            type="date"
+            value={purchasedOn}
+            onChange={(e) => {
+              setSaved(false);
+              setPurchasedOn(e.target.value);
+            }}
+            className="rounded-md border px-3 py-2"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium">メモ（任意）</span>
+          <textarea
+            value={memo}
+            onChange={(e) => {
+              setSaved(false);
+              setMemo(e.target.value);
+            }}
+            placeholder="補足があれば"
+            className="rounded-md border px-3 py-2"
+          />
+        </label>
+      </section>
+
+      {members.length === 0 ? (
+        <p className="text-sm text-zinc-500">メンバーを読み込み中…</p>
+      ) : (
+        <>
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium">支払額</h2>
+              <span className="text-sm text-zinc-500">合計 {paymentTotal} 円</span>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {members.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between gap-3">
+                  <span className="truncate">{m.name}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    aria-label={`${m.name} の支払額`}
+                    value={payments[m.userId] ?? ""}
+                    onChange={(e) => handlePaymentChange(m.userId, e.target.value)}
+                    className="w-32 rounded-md border px-3 py-2 text-right"
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium">割勘金額</h2>
+              <span className="text-sm text-zinc-500">合計 {shareTotal} 円</span>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={equalSplit}
+                onChange={(e) => {
+                  setSaved(false);
+                  const checked = e.target.checked;
+                  setEqualSplit(checked);
+                  // ON にした時点で現在の支払額合計を等分して割勘へ反映する。
+                  if (checked) {
+                    applyEqualSplit(payments);
+                  }
+                }}
+              />
+              <span>等分（支払額合計を人数で等分し、端数は自動で振り分け）</span>
+            </label>
+            <ul className="flex flex-col gap-2">
+              {members.map((m) => (
+                <li key={m.userId} className="flex items-center justify-between gap-3">
+                  <span className="truncate">{m.name}</span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      inputMode="numeric"
+                      aria-label={`${m.name} の割勘金額`}
+                      value={shares[m.userId] ?? ""}
+                      onChange={(e) => handleShareChange(m.userId, e.target.value)}
+                      className="w-32 rounded-md border px-3 py-2 text-right"
+                    />
+                    <button
+                      type="button"
+                      // 不足（deficit > 0）のときだけ活性。一致・超過時は「残りを加算」の意味を持たないため無効。
+                      disabled={deficit <= 0}
+                      onClick={() => handleFillRemainder(m.userId)}
+                      className="rounded-md border px-2 py-1 text-xs disabled:opacity-40"
+                      title="不足分をこのメンバーに加算"
+                    >
+                      残りをここに
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {/* 過不足の表示。0 なら一致。 */}
+            {deficit !== 0 && (
+              <p className="text-sm text-amber-600">
+                支払額合計との差: {deficit > 0 ? `不足 ${deficit}` : `超過 ${-deficit}`} 円
+              </p>
+            )}
+          </section>
+        </>
+      )}
+
+      {error && <p className="text-sm text-red-500">{error}</p>}
+      {saved && successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
+
+      <button
+        type="submit"
+        disabled={submitting || !canSubmit}
+        className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+      >
+        {submitLabel}
+      </button>
+    </form>
+  );
+}

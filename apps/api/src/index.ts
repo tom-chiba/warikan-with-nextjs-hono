@@ -16,7 +16,7 @@ app.use("*", (c, next) =>
   cors({
     origin: (c.env.WEB_ORIGIN ?? "http://localhost:3000").split(","),
     allowHeaders: ["Content-Type", "Authorization"],
-    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   })(c, next),
 );

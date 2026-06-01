@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 
@@ -34,22 +35,11 @@ export default function GroupsPage() {
   });
 
   if (isPending) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-        <p className="text-zinc-500">セッション確認中…</p>
-      </main>
-    );
+    return <SessionPending />;
   }
 
   if (!session) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-        <p>グループを利用するにはサインインが必要です。</p>
-        <Link href="/" className="rounded-md border px-4 py-2">
-          サインインへ
-        </Link>
-      </main>
-    );
+    return <SignInPrompt message="グループを利用するにはサインインが必要です。" />;
   }
 
   async function handleCreate(e: FormEvent) {
