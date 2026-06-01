@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
@@ -40,6 +40,18 @@ export default function UnsettledItemsPage() {
   // メンバー一覧（送金リストの表示名解決用）。
   const { data: membersData } = useGroupMembers(groupId, !!session);
 
+  const items = itemsData?.items ?? [];
+  const members = membersData?.members ?? [];
+  // userId → 表示名の索引。送金リストの行ごとに members を線形探索しないよう一度だけ構築する。
+  const nameById = useMemo(() => new Map(members.map((m) => [m.userId, m.name])), [members]);
+  const nameOf = (userId: string) => nameById.get(userId) ?? userId;
+
+  // 選択中かつ一覧に存在するアイテムだけを対象に送金リストを算出する
+  //（削除・精算で一覧から消えた id を取り残さない）。
+  // busy / error などの再描画では再計算しないよう items / selected に依存させる。
+  const selectedItems = useMemo(() => items.filter((i) => selected.has(i.id)), [items, selected]);
+  const transfers = useMemo(() => computeSettlements(selectedItems), [selectedItems]);
+
   if (isPending) {
     return <SessionPending />;
   }
@@ -47,15 +59,6 @@ export default function UnsettledItemsPage() {
   if (!session) {
     return <SignInPrompt />;
   }
-
-  const items = itemsData?.items ?? [];
-  const members = membersData?.members ?? [];
-  const nameOf = (userId: string) => members.find((m) => m.userId === userId)?.name ?? userId;
-
-  // 選択中かつ一覧に存在するアイテムだけを対象に送金リストを算出する
-  //（削除・精算で一覧から消えた id を取り残さない）。
-  const selectedItems = items.filter((i) => selected.has(i.id));
-  const transfers = computeSettlements(selectedItems);
 
   function toggle(itemId: string) {
     setSelected((prev) => {
