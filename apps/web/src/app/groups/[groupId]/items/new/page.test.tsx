@@ -81,6 +81,34 @@ test("等分スイッチ ON で支払額合計が割勘金額へ等分入力さ�
   expect(screen.getByLabelText("ともだち の割勘金額")).toHaveValue(500);
 });
 
+test("等分 ON 中に支払額を変更すると割勘が再追従する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  renderWithClient(<NewItemPage />);
+
+  const myPayment = await screen.findByLabelText("わたし の支払額");
+  await userEvent.type(myPayment, "1000");
+  await userEvent.click(screen.getByRole("checkbox")); // 500/500
+  expect(await screen.findByLabelText("わたし の割勘金額")).toHaveValue(500);
+
+  // 等分 ON のまま支払額を 2000 へ変更 → 1000/1000 に追従する（effect ではなくイベントで再計算）。
+  await userEvent.clear(myPayment);
+  await userEvent.type(myPayment, "2000");
+  expect(screen.getByLabelText("わたし の割勘金額")).toHaveValue(1000);
+  expect(screen.getByLabelText("ともだち の割勘金額")).toHaveValue(1000);
+});
+
+test("割勘が支払額を超過しているとき「残りをここに」は無効", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  renderWithClient(<NewItemPage />);
+
+  await userEvent.type(await screen.findByLabelText("わたし の支払額"), "500");
+  await userEvent.type(screen.getByLabelText("わたし の割勘金額"), "900"); // 超過（deficit < 0）
+  const fillButtons = screen.getAllByRole("button", { name: "残りをここに" });
+  expect(fillButtons[0]).toBeDisabled();
+});
+
 test("等分 ON 中に割勘を手入力するとスイッチが OFF になる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   setTwoMembers();

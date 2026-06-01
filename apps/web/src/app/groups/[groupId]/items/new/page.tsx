@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { distributeEqually } from "@/lib/split";
@@ -54,23 +54,6 @@ export default function NewItemPage() {
   const memberIds = members.map((m) => m.userId);
   const paymentTotal = totalOf(payments, memberIds);
   const shareTotal = totalOf(shares, memberIds);
-  // メンバー集合が変わったとき（読み込み完了・等分対象の変化）に等分を追従させるためのキー。
-  const memberKey = memberIds.join(",");
-
-  // 等分スイッチ ON のとき、支払額合計・メンバーの変化に追従して割勘金額を等分入力する。
-  // 端数のランダム振り分け結果はこの effect が走ったときだけ確定し、以降は state に保持されて
-  // 再描画では変わらない（依存配列が変わらない限り再計算しない）。
-  useEffect(() => {
-    if (!equalSplit || memberIds.length === 0) {
-      return;
-    }
-    const distributed = distributeEqually(paymentTotal, memberIds);
-    setShares(
-      Object.fromEntries(Object.entries(distributed).map(([id, amount]) => [id, String(amount)])),
-    );
-    // 依存は memberIds の参照ではなく memberKey（内容）で判定する。
-    // memberIds は paymentTotal / memberKey の計算元なので、両者が同値なら再計算は不要。
-  }, [equalSplit, paymentTotal, memberKey]);
 
   if (isPending) {
     return (
@@ -91,10 +74,24 @@ export default function NewItemPage() {
     );
   }
 
-  // 支払額を変更する。等分 ON のときは effect が割勘へ追従する。
+  // 等分の割勘金額を計算して shares に反映する。端数のランダム振り分け結果はこの呼び出し時点で
+  // 確定し、以降は state に保持されて再描画では変わらない（等分 ON 化・支払額変更などの操作時のみ
+  // 再計算する。effect ではなくイベントで行うことで余分な再レンダーと依存追従ロジックを避ける）。
+  function applyEqualSplit(paymentsForCalc: Record<string, string>) {
+    const distributed = distributeEqually(totalOf(paymentsForCalc, memberIds), memberIds);
+    setShares(
+      Object.fromEntries(Object.entries(distributed).map(([id, amount]) => [id, String(amount)])),
+    );
+  }
+
+  // 支払額を変更する。等分 ON のときは新しい支払額合計で割勘を再計算して追従させる。
   function handlePaymentChange(userId: string, value: string) {
     setSaved(false);
-    setPayments((prev) => ({ ...prev, [userId]: value }));
+    const next = { ...payments, [userId]: value };
+    setPayments(next);
+    if (equalSplit) {
+      applyEqualSplit(next);
+    }
   }
 
   // 割勘金額の手入力。等分の自動入力を上書きする意思表示とみなし、等分スイッチを OFF にする。
@@ -258,7 +255,12 @@ export default function NewItemPage() {
                   checked={equalSplit}
                   onChange={(e) => {
                     setSaved(false);
-                    setEqualSplit(e.target.checked);
+                    const checked = e.target.checked;
+                    setEqualSplit(checked);
+                    // ON にした時点で現在の支払額合計を等分して割勘へ反映する。
+                    if (checked) {
+                      applyEqualSplit(payments);
+                    }
                   }}
                 />
                 <span>等分（支払額合計を人数で等分し、端数は自動で振り分け）</span>
@@ -280,7 +282,8 @@ export default function NewItemPage() {
                       />
                       <button
                         type="button"
-                        disabled={deficit === 0}
+                        // 不足（deficit > 0）のときだけ活性。一致・超過時は「残りを加算」の意味を持たないため無効。
+                        disabled={deficit <= 0}
                         onClick={() => handleFillRemainder(m.userId)}
                         className="rounded-md border px-2 py-1 text-xs disabled:opacity-40"
                         title="不足分をこのメンバーに加算"
