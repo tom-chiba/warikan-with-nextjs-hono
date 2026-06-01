@@ -162,6 +162,13 @@ export default function GroupPage() {
         グループ ID: <span className="font-mono">{groupId}</span>
       </p>
 
+      <Link
+        href={`/groups/${groupId}/items/new`}
+        className="rounded-md bg-black px-4 py-2 text-white dark:bg-white dark:text-black"
+      >
+        購入品を入力
+      </Link>
+
       {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
       {(error || fetchError) && (
         <p className="w-full max-w-md text-sm text-red-500">
