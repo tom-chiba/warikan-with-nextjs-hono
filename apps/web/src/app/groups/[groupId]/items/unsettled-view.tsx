@@ -7,16 +7,16 @@ import { apiClient } from "@/lib/api-client";
 import { computeSettlements } from "@/lib/settle";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemsTable } from "./items-table";
+import { useItemActions } from "./use-item-actions";
 
 // 未精算ビュー（#19〜#22）。一覧表示・編集削除・送金計算・精算実行を担う。
 // セッション確認は親（items-page-inner）で済んでいる前提。
 export function UnsettledView({ groupId }: { groupId: string }) {
   const queryClient = useQueryClient();
+  const { busy, error, run, deleteItem } = useItemActions(groupId, "unsettled");
 
   // 選択中のアイテム id。複数選択 → 送金計算（#21）・精算実行（#22）の対象。
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // 未精算アイテム一覧（#19）。各 item に合計金額・payments・shares を含む。
   const { data: itemsData, error: fetchError } = useQuery({
@@ -60,30 +60,15 @@ export function UnsettledView({ groupId }: { groupId: string }) {
     });
   }
 
-  async function handleDelete(itemId: string, name: string) {
-    if (!window.confirm(`「${name}」を削除しますか？`)) {
-      return;
-    }
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await apiClient.groups[":groupId"].items[":itemId"].$delete({
-        param: { groupId, itemId },
-      });
-      if (!res.ok) {
-        throw new Error("アイテムの削除に失敗しました");
-      }
+  function handleDelete(itemId: string, name: string) {
+    // 削除確定後は選択セットからも除去する（送金計算に取り残さない）。
+    return deleteItem(itemId, name, () => {
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(itemId);
         return next;
       });
-      await queryClient.invalidateQueries({ queryKey: ["items", groupId, "unsettled"] });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "アイテムの削除に失敗しました");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function handleSettle() {
@@ -94,9 +79,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
     if (!window.confirm(`選択した ${itemIds.length} 件を精算済にします。よろしいですか？`)) {
       return;
     }
-    setError(null);
-    setBusy(true);
-    try {
+    await run(async () => {
       const res = await apiClient.groups[":groupId"].settlements.$post({
         param: { groupId },
         json: { itemIds },
@@ -104,21 +87,17 @@ export function UnsettledView({ groupId }: { groupId: string }) {
       if (!res.ok) {
         throw new Error("精算に失敗しました");
       }
+      // 精算でアイテムが未精算 → 精算済へ移動するため、両一覧のキャッシュを無効化する
+      //（前方一致で "unsettled" / "settled" の両キーが対象になる）。
       // サーバは groupId 一致かつ未精算の id のみ更新する。0 件なら（既に精算済・削除済等で）
-      // 実質何も変わっていないため、成功表示せず警告する。
+      // 一覧が古い可能性が高いので、先に最新化してから警告する。
       const { settled } = await res.json();
+      await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
       if (settled.length === 0) {
         throw new Error("精算対象がありませんでした（既に精算済みか削除済みの可能性があります）");
       }
       setSelected(new Set());
-      // 精算でアイテムが未精算 → 精算済へ移動するため、両一覧のキャッシュを無効化する。
-      await queryClient.invalidateQueries({ queryKey: ["items", groupId, "unsettled"] });
-      await queryClient.invalidateQueries({ queryKey: ["items", groupId, "settled"] });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "精算に失敗しました");
-    } finally {
-      setBusy(false);
-    }
+    }, "精算に失敗しました");
   }
 
   return (

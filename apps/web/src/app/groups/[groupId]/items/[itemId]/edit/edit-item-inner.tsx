@@ -66,8 +66,10 @@ export function EditItemInner() {
           : "アイテムの更新に失敗しました",
       );
     }
-    // 更新後は遷移元の一覧・当該アイテムのキャッシュを無効化して元の一覧へ戻る。
-    await queryClient.invalidateQueries({ queryKey: ["items", groupId, from] });
+    // 更新後は一覧・当該アイテムのキャッシュを無効化して元の一覧へ戻る。
+    // from は URL パラメータでありアイテムの実際の status と一致する保証がないため、
+    // 前方一致（["items", groupId]）で未精算・精算済の両一覧を無効化する。
+    await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
     await queryClient.invalidateQueries({ queryKey: ["item", groupId, itemId] });
     router.push(listPath);
   }
