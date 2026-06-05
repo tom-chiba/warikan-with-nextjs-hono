@@ -153,6 +153,12 @@ export default function GroupPage() {
         <Link href={`/groups/${groupId}/items`} className="rounded-md border px-4 py-2">
           未精算一覧
         </Link>
+        <Link
+          href={`/groups/${groupId}/items?status=settled`}
+          className="rounded-md border px-4 py-2"
+        >
+          精算済一覧
+        </Link>
       </div>
 
       {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}

@@ -2,15 +2,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
-const { useSessionMock, itemGetMock, membersGetMock, putMock, pushMock } = vi.hoisted(() => ({
-  useSessionMock: vi.fn(),
-  itemGetMock: vi.fn(),
-  membersGetMock: vi.fn(),
-  putMock: vi.fn(),
-  pushMock: vi.fn(),
-}));
+const { useSessionMock, itemGetMock, membersGetMock, putMock, pushMock, searchParamsMock } =
+  vi.hoisted(() => ({
+    useSessionMock: vi.fn(),
+    itemGetMock: vi.fn(),
+    membersGetMock: vi.fn(),
+    putMock: vi.fn(),
+    pushMock: vi.fn(),
+    searchParamsMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/auth-client", () => ({
   useSession: () => useSessionMock(),
@@ -18,6 +20,7 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("next/navigation", () => ({
   useParams: () => ({ groupId: "g1", itemId: "i1" }),
   useRouter: () => ({ push: pushMock }),
+  useSearchParams: () => searchParamsMock(),
 }));
 vi.mock("@/lib/api-client", () => ({
   apiClient: {
@@ -61,6 +64,11 @@ const item = {
     ],
   },
 };
+
+beforeEach(() => {
+  // 既定は未精算一覧からの遷移（クエリパラメータなし）。
+  searchParamsMock.mockReturnValue(new URLSearchParams(""));
+});
 
 afterEach(() => {
   cleanup();
@@ -114,18 +122,24 @@ test("更新すると PUT が呼ばれ、一覧へ遷移する", async () => {
   });
 });
 
-test("精算済アイテムは編集できず、フォームは表示されない", async () => {
+test("精算済アイテムも編集でき、from=settled なら更新後に精算済一覧へ遷移する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
+  searchParamsMock.mockReturnValue(new URLSearchParams("from=settled"));
   itemGetMock.mockResolvedValue({
     ok: true,
     json: async () => ({ item: { ...item.item, status: "settled" } }),
   });
   membersGetMock.mockResolvedValue({ ok: true, json: async () => members });
+  putMock.mockResolvedValue({ ok: true, json: async () => ({ id: "i1" }) });
 
   renderWithClient(<EditItemPage />);
 
-  expect(
-    await screen.findByText("このアイテムは精算済みのため編集できません。"),
-  ).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "更新" })).not.toBeInTheDocument();
+  // 精算済でもフォームがプリフィルされて表示される（Issue #24）。
+  await screen.findByDisplayValue("ランチ");
+  await userEvent.click(screen.getByRole("button", { name: "更新" }));
+
+  await waitFor(() => {
+    expect(putMock).toHaveBeenCalled();
+    expect(pushMock).toHaveBeenCalledWith("/groups/g1/items?status=settled");
+  });
 });
