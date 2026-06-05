@@ -5,10 +5,11 @@ import { addMember, createGroup } from "../helpers/group";
 
 const BASE = env.BETTER_AUTH_URL;
 
-// ブラウザが付与する Origin ヘッダ（trustedOrigins のデフォルト値）。
-// Better Auth は cookie 付き POST に origin/referer が無いと CSRF として 403 を返すため、
-// 実際のクライアントと同様に origin を明示する。
-const WEB_ORIGIN = "http://localhost:3000";
+// ブラウザが付与する Origin ヘッダ。Better Auth は cookie 付き POST に origin/referer が
+// 無いと CSRF として 403 を返すため、実際のクライアントと同様に origin を明示する。
+// 値は BETTER_AUTH_URL と同様 vitest.config.ts の miniflare bindings を単一ソースとする
+//（WEB_ORIGIN はカンマ区切りで複数指定できるため先頭を使う）。
+const WEB_ORIGIN = env.WEB_ORIGIN.split(",")[0];
 
 // Better Auth のアカウント削除エンドポイント（パスワード再入力方式）。
 function deleteUser(cookie: string, password = "password1234") {
