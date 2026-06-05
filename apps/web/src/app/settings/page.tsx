@@ -28,14 +28,20 @@ export default function SettingsPage() {
     }
     setError(null);
     setSubmitting(true);
-    const res = await authClient.deleteUser({ password });
-    if (res.error) {
-      setError(res.error.message ?? "アカウントの削除に失敗しました");
+    try {
+      const res = await authClient.deleteUser({ password });
+      if (res.error) {
+        setError(res.error.message ?? "アカウントの削除に失敗しました");
+        return;
+      }
+      // 削除成功時はセッションも無効化済みのため、ホーム（サインイン画面）へ戻す。
+      router.push("/");
+    } catch {
+      // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
+      setError("アカウントの削除に失敗しました");
+    } finally {
       setSubmitting(false);
-      return;
     }
-    // 削除成功時はセッションも無効化済みのため、ホーム（サインイン画面）へ戻す。
-    router.push("/");
   }
 
   return (

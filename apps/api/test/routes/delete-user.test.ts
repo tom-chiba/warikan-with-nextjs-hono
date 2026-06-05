@@ -1,28 +1,9 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { getUserId, signUpAndGetCookie } from "../helpers/auth-session";
+import { addMember, createGroup } from "../helpers/group";
 
 const BASE = env.BETTER_AUTH_URL;
-
-// API 経由でグループを作成し（作成者が owner）、id を返す。
-async function createGroup(cookie: string, name = "旅行"): Promise<string> {
-  const res = await SELF.fetch(`${BASE}/groups`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify({ name }),
-  });
-  return ((await res.json()) as { id: string }).id;
-}
-
-// 既存グループに member を直接 INSERT する（group-members.test.ts と同じテスト用ヘルパー）。
-async function addMember(groupId: string, userId: string, role = "member") {
-  const nowSec = Math.floor(Date.now() / 1000);
-  await env.DB.prepare(
-    "INSERT INTO group_member (group_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)",
-  )
-    .bind(groupId, userId, role, nowSec)
-    .run();
-}
 
 // ブラウザが付与する Origin ヘッダ（trustedOrigins のデフォルト値）。
 // Better Auth は cookie 付き POST に origin/referer が無いと CSRF として 403 を返すため、

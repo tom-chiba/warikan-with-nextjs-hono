@@ -1,18 +1,9 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { signUpAndGetCookie } from "../helpers/auth-session";
+import { createGroup } from "../helpers/group";
 
 const BASE = env.BETTER_AUTH_URL;
-
-// API 経由でグループを作成し（作成者が owner メンバーになる）、id を返す。
-async function createGroup(cookie: string, name = "旅行"): Promise<string> {
-  const res = await SELF.fetch(`${BASE}/groups`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify({ name }),
-  });
-  return ((await res.json()) as { id: string }).id;
-}
 
 function issueInvite(cookie: string, groupId: string) {
   return SELF.fetch(`${BASE}/groups/${groupId}/invitations`, {

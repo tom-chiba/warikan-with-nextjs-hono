@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createDb } from "../../src/db";
 import { group, groupMember } from "../../src/db/schema";
 import { getUserId, signUpAndGetCookie } from "../helpers/auth-session";
+import { createGroup } from "../helpers/group";
 
 const BASE = env.BETTER_AUTH_URL;
 
@@ -84,17 +85,6 @@ describe("POST /groups（グループ作成）", () => {
     expect(row).toBeNull();
   });
 });
-
-// API 経由でグループを作成して id を返すヘルパー。
-async function createGroup(cookie: string, name: string): Promise<string> {
-  const res = await SELF.fetch(`${BASE}/groups`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify({ name }),
-  });
-  const body = (await res.json()) as { id: string };
-  return body.id;
-}
 
 describe("GET /groups（所属グループ一覧）", () => {
   it("自分が所属するグループだけを role 付きで返す", async () => {

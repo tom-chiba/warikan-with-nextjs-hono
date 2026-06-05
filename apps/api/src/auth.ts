@@ -8,13 +8,15 @@ import { group, groupMember } from "./db/schema";
 // D1 バインディングや secret は実行時 env から渡るため、
 // auth インスタンスはシングルトンにせずリクエストごとに生成する。
 export function createAuth(env: Env) {
+  // adapter と afterDelete で同じリクエストスコープの Drizzle インスタンスを共有する。
+  const db = createDb(env.DB);
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     // ブラウザは別オリジン(dev: localhost:3000)から認証を呼ぶため、CSRF 用に信頼する。
     // 本番は WEB_ORIGIN（カンマ区切りで複数可）で差し替える。
     trustedOrigins: (env.WEB_ORIGIN ?? "http://localhost:3000").split(","),
-    database: drizzleAdapter(createDb(env.DB), {
+    database: drizzleAdapter(db, {
       provider: "sqlite",
       schema,
     }),
@@ -35,7 +37,6 @@ export function createAuth(env: Env) {
         // 起点のため UI に露出しない: ADR-0010）。次回の退会時に自動回収される。
         afterDelete: async () => {
           try {
-            const db = createDb(env.DB);
             await db
               .delete(group)
               .where(

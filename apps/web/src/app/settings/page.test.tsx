@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 // auth-client と next/navigation をモックする。vi.hoisted で巻き上げ順の問題を回避する。
 const { useSessionMock, deleteUserMock, pushMock, confirmMock } = vi.hoisted(() => ({
@@ -21,6 +21,12 @@ vi.mock("next/navigation", () => ({
 import SettingsPage from "./page";
 
 Object.defineProperty(window, "confirm", { value: confirmMock, configurable: true });
+
+// confirm は既定で「承認」とし、キャンセルを検証するテストだけ false に上書きする
+//（groups/[groupId]/page.test.tsx と同じパターン）。
+beforeEach(() => {
+  confirmMock.mockReturnValue(true);
+});
 
 afterEach(() => {
   cleanup();
@@ -85,7 +91,6 @@ test("confirm でキャンセルすると deleteUser を呼ばない", async () 
 
 test("削除に成功するとホームへ遷移する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
-  confirmMock.mockReturnValue(true);
   deleteUserMock.mockResolvedValue({ error: null });
 
   render(<SettingsPage />);
@@ -97,7 +102,6 @@ test("削除に成功するとホームへ遷移する", async () => {
 
 test("削除に失敗するとエラーメッセージを表示し遷移しない", async () => {
   useSessionMock.mockReturnValue(loggedIn);
-  confirmMock.mockReturnValue(true);
   deleteUserMock.mockResolvedValue({ error: { message: "パスワードが正しくありません" } });
 
   render(<SettingsPage />);
@@ -106,5 +110,19 @@ test("削除に失敗するとエラーメッセージを表示し遷移しな�
   await waitFor(() => expect(screen.getByText("パスワードが正しくありません")).toBeInTheDocument());
   expect(pushMock).not.toHaveBeenCalled();
   // 失敗後は再入力して再試行できる（ボタンが再度有効になる）。
+  expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeEnabled();
+});
+
+test("ネットワークエラー時もエラーメッセージを表示しボタンが再度有効になる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  deleteUserMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+  render(<SettingsPage />);
+  await submitDelete();
+
+  await waitFor(() =>
+    expect(screen.getByText("アカウントの削除に失敗しました")).toBeInTheDocument(),
+  );
+  expect(pushMock).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeEnabled();
 });
