@@ -7,4 +7,8 @@ interface Env {
   // 許可するフロントエンドのオリジン（CORS / trustedOrigins）。未設定なら localhost:3000。
   // カンマ区切りで複数指定可。
   WEB_ORIGIN?: string;
+  // テスト時のみ vitest.config.ts の miniflare.bindings で注入するフラグ(#42)。
+  // truthy ならパスワードハッシュを scrypt から SHA-256 に差し替えてテストを高速化する。
+  // 本番の wrangler.jsonc の vars / wrangler secret には絶対に追加しないこと。
+  TEST_HASH?: string;
 }

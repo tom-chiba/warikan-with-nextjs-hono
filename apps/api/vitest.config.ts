@@ -14,7 +14,9 @@ export default defineConfig(async () => {
   return {
     plugins: [
       cloudflareTest({
-        singleWorker: true,
+        // 注: 旧 poolOptions の singleWorker は v0.16 の WorkersPoolOptionsSchema に
+        // 存在せず無視される(指定しても挙動は変わらない)ため指定しない。
+        // 現バージョンは常に 1 Miniflare・D1 共有・テストファイル逐次実行。
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           bindings: {
@@ -26,15 +28,17 @@ export default defineConfig(async () => {
             // trustedOrigins 用。CI には .dev.vars が無く wrangler.jsonc の本番値に
             // フォールバックして CSRF 403 になるため、テストではここで固定する。
             WEB_ORIGIN: "http://localhost:3000",
+            // パスワードハッシュを scrypt から SHA-256 に差し替えてテストを高速化する
+            // (#42 / ADR-0012)。値は任意の truthy 文字列。本番には存在しないキー。
+            TEST_HASH: "1",
           },
         },
       }),
     ],
     test: {
       setupFiles: ["./test/apply-migrations.ts"],
-      // Better Auth のパスワードハッシュ(scrypt)は Miniflare 上で重く、
-      // デフォルトの 5s timeout を超えることがあるため引き上げる。
-      testTimeout: 30_000,
+      // testTimeout はデフォルト(5s)のまま。以前は scrypt が重く 30s に引き上げていたが、
+      // テストでは SHA-256(TEST_HASH)に差し替えたため不要になった(#42 / ADR-0012)。
     },
   };
 });
