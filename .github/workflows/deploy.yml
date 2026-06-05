@@ -20,7 +20,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     # workflow_run は CI が失敗・キャンセルでも発火するため、成功時のみ実行する。
-    if: github.event.workflow_run.conclusion == 'success'
+    # また、フォークの main ブランチからの PR でも branches フィルタを通過してしまうため、
+    # push 起因(= 本リポジトリ main へのマージ)の CI に限定する。
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
     steps:
       # デフォルトでは main 最新がチェックアウトされるため、
       # CI が検証したコミットを明示的に指定する。
