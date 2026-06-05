@@ -31,7 +31,13 @@ export default function SettingsPage() {
     try {
       const res = await authClient.deleteUser({ password });
       if (res.error) {
-        setError(res.error.message ?? "アカウントの削除に失敗しました");
+        // Better Auth 本体のエラーメッセージは英語のため、UI で起きうる誤パスワードは
+        // コードから日本語にマップする。自前の hooks.before は日本語 message をそのまま使う。
+        setError(
+          res.error.code === "INVALID_PASSWORD"
+            ? "パスワードが正しくありません"
+            : (res.error.message ?? "アカウントの削除に失敗しました"),
+        );
         return;
       }
       // 削除成功時はセッションも無効化済みのため、ホーム（サインイン画面）へ戻す。

@@ -100,9 +100,12 @@ test("削除に成功するとホームへ遷移する", async () => {
   await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
 });
 
-test("削除に失敗するとエラーメッセージを表示し遷移しない", async () => {
+test("誤パスワードでは日本語のエラーメッセージを表示し遷移しない", async () => {
   useSessionMock.mockReturnValue(loggedIn);
-  deleteUserMock.mockResolvedValue({ error: { message: "パスワードが正しくありません" } });
+  // Better Auth 本体のエラーは英語 message + code で返る（実レスポンスと同形）。
+  deleteUserMock.mockResolvedValue({
+    error: { code: "INVALID_PASSWORD", message: "Invalid password" },
+  });
 
   render(<SettingsPage />);
   await submitDelete("wrong-password");
@@ -111,6 +114,17 @@ test("削除に失敗するとエラーメッセージを表示し遷移しな�
   expect(pushMock).not.toHaveBeenCalled();
   // 失敗後は再入力して再試行できる（ボタンが再度有効になる）。
   expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeEnabled();
+});
+
+test("code の無いエラーは message をそのまま表示する（自前フックの日本語 message）", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  deleteUserMock.mockResolvedValue({ error: { message: "パスワードを入力してください" } });
+
+  render(<SettingsPage />);
+  await submitDelete();
+
+  await waitFor(() => expect(screen.getByText("パスワードを入力してください")).toBeInTheDocument());
+  expect(pushMock).not.toHaveBeenCalled();
 });
 
 test("ネットワークエラー時もエラーメッセージを表示しボタンが再度有効になる", async () => {
