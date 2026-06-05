@@ -32,6 +32,9 @@ export default function Home() {
       <section className="mt-4 flex flex-col items-center gap-3 border-t border-zinc-200 pt-8 dark:border-zinc-800">
         <h2 className="text-lg font-medium">アカウント</h2>
         <AuthPanel />
+        <Link href="/settings" className="text-sm text-zinc-500 underline">
+          アカウント設定
+        </Link>
       </section>
 
       <Link href="/groups" className="rounded-md border px-4 py-2">

@@ -23,6 +23,9 @@ export default defineConfig(async () => {
             // Better Auth 用のテスト値（本番シークレットとは無関係）。
             BETTER_AUTH_SECRET: "test-secret-value-at-least-32-bytes-long",
             BETTER_AUTH_URL: "http://localhost:8787",
+            // trustedOrigins 用。CI には .dev.vars が無く wrangler.jsonc の本番値に
+            // フォールバックして CSRF 403 になるため、テストではここで固定する。
+            WEB_ORIGIN: "http://localhost:3000",
           },
         },
       }),

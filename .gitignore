@@ -42,3 +42,6 @@ pnpm-debug.log*
 !.vscode/extensions.json
 !.vscode/settings.json
 *.tsbuildinfo
+
+# Claude Code のセッション一時ファイル
+.claude/scheduled_tasks.lock
