@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { eq, notExists } from "drizzle-orm";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
@@ -22,6 +23,17 @@ export function createAuth(env: Env) {
     }),
     emailAndPassword: {
       enabled: true,
+    },
+    hooks: {
+      // Better Auth の /delete-user はパスワード未指定（空文字含む）だと fresh session
+      //（既定 24 時間以内に発行されたセッション）であれば削除を許可するフォールバックを持つ。
+      // 本人確認は「パスワード再入力で即削除」（#33 / ADR-0011）のため、UI 任せにせず
+      // サーバー側でもパスワード必須を強制する。
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/delete-user" && !ctx.body?.password) {
+          throw new APIError("BAD_REQUEST", { message: "パスワードを入力してください" });
+        }
+      }),
     },
     user: {
       // アカウント削除（退会）。パスワード再入力（authClient.deleteUser({ password })）で

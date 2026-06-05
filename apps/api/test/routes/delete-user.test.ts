@@ -122,6 +122,34 @@ describe("POST /api/auth/delete-user（アカウント削除）", () => {
     expect(shares.results.map((s) => s.user_id)).toEqual([memberId]);
   });
 
+  // Better Auth はパスワード未指定だと fresh session での削除にフォールバックするが、
+  // 本人確認をパスワード再入力で強制するため hooks.before で 400 にしている（ADR-0011）。
+  it("パスワード未指定では fresh session でも削除されない", async () => {
+    const cookie = await signUpAndGetCookie("du-no-password@example.com");
+    const userId = await getUserId(env.DB, "du-no-password@example.com");
+
+    const res = await SELF.fetch(`${BASE}/api/auth/delete-user`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie, origin: WEB_ORIGIN },
+      body: JSON.stringify({}),
+    });
+
+    expect(res.status).toBe(400);
+    const user = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
+    expect(user).not.toBeNull();
+  });
+
+  it("空文字のパスワードでも削除されない", async () => {
+    const cookie = await signUpAndGetCookie("du-empty-password@example.com");
+    const userId = await getUserId(env.DB, "du-empty-password@example.com");
+
+    const res = await deleteUser(cookie, "");
+
+    expect(res.status).toBe(400);
+    const user = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
+    expect(user).not.toBeNull();
+  });
+
   it("誤ったパスワードでは削除されない", async () => {
     const cookie = await signUpAndGetCookie("du-wrong@example.com");
     const userId = await getUserId(env.DB, "du-wrong@example.com");
