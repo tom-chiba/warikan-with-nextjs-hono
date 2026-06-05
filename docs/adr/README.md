@@ -24,3 +24,4 @@
 | 0008 | [テスト戦略](./0008-testing-strategy.md)                                                       | accepted |
 | 0009 | [グループ単位の認可レイヤの構成](./0009-group-authorization-layer.md)                          | accepted |
 | 0010 | [ハンドラへの DB 注入とコレクションルートの認可](./0010-db-injection-and-collection-routes.md) | accepted |
+| 0011 | [アカウント削除（退会）と孤児グループの掃除](./0011-account-deletion.md)                       | accepted |
