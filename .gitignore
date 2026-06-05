@@ -27,6 +27,8 @@ coverage/
 playwright-report/
 test-results/
 .playwright/
+# playwright-cli（動作確認用）のスナップショット・ログ
+.playwright-cli/
 
 # logs
 *.log

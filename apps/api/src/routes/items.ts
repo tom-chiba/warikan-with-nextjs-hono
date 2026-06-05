@@ -224,14 +224,12 @@ export const items = new Hono<{
       return c.json({ error: "グループに属さないメンバーが含まれています" }, 400);
     }
 
-    // 対象が当該グループの未精算 item として存在するか確認する。編集は未精算アイテムのみ可とし、
-    // 精算済（settled）アイテムの改変は防ぐ（精算済の操作は別途 精算済ページの機能で扱う）。
+    // 対象が当該グループの item として存在するか確認する。精算済（settled）アイテムも
+    // 編集可（Issue #24: 精算済の誤り訂正に対応。status 自体はここでは変更しない）。
     const existing = await db
       .select({ id: item.id })
       .from(item)
-      .where(
-        and(eq(item.id, itemId), eq(item.groupId, member.groupId), eq(item.status, "unsettled")),
-      )
+      .where(and(eq(item.id, itemId), eq(item.groupId, member.groupId)))
       .get();
     if (!existing) {
       return c.json({ error: "Not Found" }, 404);
@@ -248,9 +246,8 @@ export const items = new Hono<{
           memo: memo ?? null,
           updatedAt: new Date(),
         })
-        // 存在確認(existing)と batch の間に settled 化された場合に精算済を上書きしないよう、
-        // 更新条件にも status = "unsettled" を含めて防御する（TOCTOU 対策）。
-        .where(and(eq(item.id, itemId), eq(item.status, "unsettled"))),
+        // status は問わないが、groupId の一致は WHERE でも保証する（存在確認との二重防御）。
+        .where(and(eq(item.id, itemId), eq(item.groupId, member.groupId))),
       db.delete(itemPayment).where(eq(itemPayment.itemId, itemId)),
       db.delete(itemShare).where(eq(itemShare.itemId, itemId)),
       db.insert(itemPayment).values(makeRows(itemId, payments)),
@@ -259,7 +256,7 @@ export const items = new Hono<{
 
     return c.json({ id: itemId });
   })
-  // 購入品を削除する。削除は未精算アイテムのみ可（精算済アイテムは別途 精算済ページの機能で扱う）。
+  // 購入品を削除する。未精算・精算済を問わず削除できる（Issue #24）。
   // item_payment / item_share は外部キー CASCADE で消える（groups と同方針）。
   .delete("/:groupId/items/:itemId", async (c) => {
     const member = c.get("groupMember");
@@ -268,9 +265,7 @@ export const items = new Hono<{
 
     const deleted = await db
       .delete(item)
-      .where(
-        and(eq(item.id, itemId), eq(item.groupId, member.groupId), eq(item.status, "unsettled")),
-      )
+      .where(and(eq(item.id, itemId), eq(item.groupId, member.groupId)))
       .returning({ id: item.id });
     if (deleted.length === 0) {
       return c.json({ error: "Not Found" }, 404);
@@ -302,5 +297,31 @@ export const items = new Hono<{
         .returning({ id: item.id });
 
       return c.json({ settled: settled.map((r) => r.id) });
+    },
+  )
+  // 精算を取り消し、未精算に戻す（Issue #24）。POST /settlements の逆操作。
+  // groupId 一致かつ status = "settled" の id だけを対象にし、他グループや未精算の巻き込みを防ぐ。
+  // 実際に更新できた id を返す（存在しない / 既に未精算の id は黙って無視される）。
+  .post(
+    "/:groupId/unsettlements",
+    zValidator("json", z.object({ itemIds: z.array(z.string().min(1)).min(1) })),
+    async (c) => {
+      const member = c.get("groupMember");
+      const db = c.get("db");
+      const { itemIds } = c.req.valid("json");
+
+      const unsettled = await db
+        .update(item)
+        .set({ status: "unsettled", updatedAt: new Date() })
+        .where(
+          and(
+            eq(item.groupId, member.groupId),
+            eq(item.status, "settled"),
+            inArray(item.id, itemIds),
+          ),
+        )
+        .returning({ id: item.id });
+
+      return c.json({ unsettled: unsettled.map((r) => r.id) });
     },
   );
