@@ -1,0 +1,45 @@
+name: Deploy
+
+on:
+  # CI ワークフロー(check + e2e)が main で完了したら起動する。
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# デプロイの並走を防ぐ。マイグレーション中の強制中断を避けるため
+# 実行中のデプロイはキャンセルしない(後続は最新の 1 件だけキューされる)。
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # workflow_run は CI が失敗・キャンセルでも発火するため、成功時のみ実行する。
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      # デフォルトでは main 最新がチェックアウトされるため、
+      # CI が検証したコミットを明示的に指定する。
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: jdx/mise-action@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      # 旧コードが新スキーマで動けるよう「マイグレーション → デプロイ」の順を守る
+      # (後方互換のあるマイグレーションを前提とする)。
+      - run: pnpm --filter @warikan/api db:migrate:remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - run: pnpm --filter @warikan/api deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
