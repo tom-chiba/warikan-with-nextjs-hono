@@ -258,6 +258,14 @@ function settle(cookie: string, groupId: string, itemIds: string[]) {
   });
 }
 
+function unsettle(cookie: string, groupId: string, itemIds: string[]) {
+  return SELF.fetch(`${BASE}/groups/${groupId}/unsettlements`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", cookie },
+    body: JSON.stringify({ itemIds }),
+  });
+}
+
 type ListedItem = {
   id: string;
   name: string;
@@ -440,7 +448,7 @@ describe("PUT /groups/:groupId/items/:itemId（更新）", () => {
     expect(res.status).toBe(404);
   });
 
-  it("精算済アイテムは更新できない（404）", async () => {
+  it("精算済アイテムも更新できる（200・status は settled のまま）", async () => {
     const cookie = await signUpAndGetCookie("put-settled@example.com");
     const userId = await getUserId(env.DB, "put-settled@example.com");
     const groupId = await createGroup(cookie);
@@ -453,16 +461,17 @@ describe("PUT /groups/:groupId/items/:itemId（更新）", () => {
     await settle(cookie, groupId, [itemId]);
 
     const res = await putItem(cookie, groupId, itemId, {
-      name: "改変",
+      name: "訂正後",
       payments: [{ userId, amount: 999 }],
       shares: [{ userId, amount: 999 }],
     });
-    expect(res.status).toBe(404);
-    // 内容が書き換わっていないこと。
-    const name = await env.DB.prepare("SELECT name FROM item WHERE id = ?")
+    expect(res.status).toBe(200);
+    // 内容が更新され、status は settled のまま変わらないこと。
+    const row = await env.DB.prepare("SELECT name, status FROM item WHERE id = ?")
       .bind(itemId)
-      .first<{ name: string }>();
-    expect(name?.name).toBe("精算済");
+      .first<{ name: string; status: string }>();
+    expect(row?.name).toBe("訂正後");
+    expect(row?.status).toBe("settled");
   });
 });
 
@@ -495,7 +504,7 @@ describe("DELETE /groups/:groupId/items/:itemId（削除）", () => {
     expect(res.status).toBe(404);
   });
 
-  it("精算済アイテムは削除できない（404・残存）", async () => {
+  it("精算済アイテムも削除できる（200）", async () => {
     const cookie = await signUpAndGetCookie("del-settled@example.com");
     const userId = await getUserId(env.DB, "del-settled@example.com");
     const groupId = await createGroup(cookie);
@@ -508,11 +517,11 @@ describe("DELETE /groups/:groupId/items/:itemId（削除）", () => {
     await settle(cookie, groupId, [itemId]);
 
     const res = await deleteItem(cookie, groupId, itemId);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
     const count = await env.DB.prepare("SELECT COUNT(*) AS c FROM item WHERE id = ?")
       .bind(itemId)
       .first<{ c: number }>();
-    expect(count?.c).toBe(1);
+    expect(count?.c).toBe(0);
   });
 });
 
@@ -564,6 +573,74 @@ describe("POST /groups/:groupId/settlements（精算実行）", () => {
     const strangerCookie = await signUpAndGetCookie("settle-stranger@example.com");
     const groupId = await createGroup(ownerCookie);
     const res = await settle(strangerCookie, groupId, ["anything"]);
+    expect(res.status).toBe(403);
+  });
+});
+
+describe("POST /groups/:groupId/unsettlements（未精算に戻す）", () => {
+  it("精算済アイテムを未精算に戻せ、未精算一覧に再表示される", async () => {
+    const cookie = await signUpAndGetCookie("unsettle-owner@example.com");
+    const userId = await getUserId(env.DB, "unsettle-owner@example.com");
+    const groupId = await createGroup(cookie);
+    const created = await postItem(cookie, groupId, {
+      name: "戻す対象",
+      payments: [{ userId, amount: 100 }],
+      shares: [{ userId, amount: 100 }],
+    });
+    const itemId = ((await created.json()) as { id: string }).id;
+    await settle(cookie, groupId, [itemId]);
+
+    const res = await unsettle(cookie, groupId, [itemId]);
+    expect(res.status).toBe(200);
+    const { unsettled } = (await res.json()) as { unsettled: string[] };
+    expect(unsettled).toEqual([itemId]);
+
+    // 未精算一覧に再表示され、精算済一覧からは消える。
+    const unsettledList = (await (await listItems(cookie, groupId)).json()) as {
+      items: ListedItem[];
+    };
+    expect(unsettledList.items.map((i) => i.id)).toEqual([itemId]);
+    const settledList = (await (await listItems(cookie, groupId, "settled")).json()) as {
+      items: ListedItem[];
+    };
+    expect(settledList.items).toHaveLength(0);
+  });
+
+  it("他グループ／未精算の id は巻き込まれない（unsettled に含まれない）", async () => {
+    const cookie = await signUpAndGetCookie("unsettle-scope@example.com");
+    const userId = await getUserId(env.DB, "unsettle-scope@example.com");
+    const groupId = await createGroup(cookie);
+    const r1 = await postItem(cookie, groupId, {
+      name: "精算済",
+      payments: [{ userId, amount: 100 }],
+      shares: [{ userId, amount: 100 }],
+    });
+    const settledId = ((await r1.json()) as { id: string }).id;
+    await settle(cookie, groupId, [settledId]);
+    const r2 = await postItem(cookie, groupId, {
+      name: "未精算のまま",
+      payments: [{ userId, amount: 200 }],
+      shares: [{ userId, amount: 200 }],
+    });
+    const unsettledId = ((await r2.json()) as { id: string }).id;
+
+    const res = await unsettle(cookie, groupId, [settledId, unsettledId, "foreign-id"]);
+    const { unsettled } = (await res.json()) as { unsettled: string[] };
+    expect(unsettled).toEqual([settledId]);
+  });
+
+  it("itemIds が空配列なら 400", async () => {
+    const cookie = await signUpAndGetCookie("unsettle-empty@example.com");
+    const groupId = await createGroup(cookie);
+    const res = await unsettle(cookie, groupId, []);
+    expect(res.status).toBe(400);
+  });
+
+  it("当該グループのメンバーでなければ 403", async () => {
+    const ownerCookie = await signUpAndGetCookie("unsettle-auth-owner@example.com");
+    const strangerCookie = await signUpAndGetCookie("unsettle-stranger@example.com");
+    const groupId = await createGroup(ownerCookie);
+    const res = await unsettle(strangerCookie, groupId, ["anything"]);
     expect(res.status).toBe(403);
   });
 });
