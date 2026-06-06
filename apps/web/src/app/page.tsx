@@ -1,6 +1,5 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { SessionError, SessionPending } from "@/components/session-states";
 import { APP_NAME } from "@/lib/app-meta";
@@ -11,7 +10,6 @@ import { QuickItemEntry } from "./quick-item-entry";
 
 export default function Home() {
   const { data: session, isPending, error, refetch } = useSession();
-  const queryClient = useQueryClient();
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
@@ -80,11 +78,7 @@ export default function Home() {
           </div>
           <button
             type="button"
-            onClick={async () => {
-              await signOut();
-              // 前のユーザーのグループ等が次のサインインで一瞬表示されないよう、キャッシュごと破棄する。
-              queryClient.clear();
-            }}
+            onClick={() => signOut()}
             className="text-sm text-zinc-500 underline"
           >
             サインアウト
