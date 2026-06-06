@@ -172,6 +172,88 @@ test("削除ボタンで該当アイテムの DELETE が呼ばれる", async () 
   });
 });
 
+// ---- 全選択チェックボックス（#49）----
+
+// friend が 2000 立替、owner/friend で 1000 ずつ負担する 1 件（lunchItem と合わせて 2 件で使う）。
+const dinnerItem = {
+  id: "i2",
+  name: "ディナー",
+  purchasedOn: "2026-06-02T00:00:00.000Z",
+  memo: null,
+  status: "unsettled",
+  total: 2000,
+  payments: [{ userId: "friend", amount: 2000 }],
+  shares: [
+    { userId: "owner", amount: 1000 },
+    { userId: "friend", amount: 1000 },
+  ],
+};
+
+test("全て選択チェックボックスで全アイテムが選択される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ items: [lunchItem, dinnerItem] }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  const selectAll = await screen.findByLabelText("全て選択");
+  expect(selectAll).not.toBeChecked();
+
+  await userEvent.click(selectAll);
+
+  expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
+  expect(screen.getByLabelText("ディナー を選択")).toBeChecked();
+  expect(selectAll).toBeChecked();
+  // 全 2 件が送金計算の対象になっている。
+  expect(screen.getByText("送金リスト（選択 2 件）")).toBeInTheDocument();
+});
+
+test("全件選択済みで全て選択チェックボックスを押すと全件解除される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ items: [lunchItem, dinnerItem] }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  const selectAll = await screen.findByLabelText("全て選択");
+  await userEvent.click(selectAll);
+  await userEvent.click(selectAll);
+
+  expect(screen.getByLabelText("ランチ を選択")).not.toBeChecked();
+  expect(screen.getByLabelText("ディナー を選択")).not.toBeChecked();
+  expect(selectAll).not.toBeChecked();
+  expect(screen.queryByText(/送金リスト/)).not.toBeInTheDocument();
+});
+
+test("一部選択のとき全て選択チェックボックスは indeterminate になり、押すと全件選択される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ items: [lunchItem, dinnerItem] }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  const selectAll = await screen.findByLabelText<HTMLInputElement>("全て選択");
+  expect(selectAll.indeterminate).toBe(false);
+
+  await userEvent.click(screen.getByLabelText("ランチ を選択"));
+
+  expect(selectAll.indeterminate).toBe(true);
+  expect(selectAll).not.toBeChecked();
+
+  // 一部選択からの押下は「全件選択」になる。
+  await userEvent.click(selectAll);
+
+  expect(selectAll.indeterminate).toBe(false);
+  expect(selectAll).toBeChecked();
+  expect(screen.getByLabelText("ディナー を選択")).toBeChecked();
+});
+
 // ---- 精算済ビュー（?status=settled）----
 
 const settledItem = { ...lunchItem, status: "settled" };
@@ -189,8 +271,9 @@ test("精算済ビューではアイテムが表示され、選択チェック�
 
   expect(await screen.findByText("ランチ")).toBeInTheDocument();
   expect(screen.getByText("1000 円")).toBeInTheDocument();
-  // 精算対象の選択は未精算ビュー専用。
+  // 精算対象の選択は未精算ビュー専用（全選択ヘッダー含む）。
   expect(screen.queryByLabelText("ランチ を選択")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("全て選択")).not.toBeInTheDocument();
   // status=settled で一覧を取得している。
   expect(itemsGetMock).toHaveBeenCalledWith({
     param: { groupId: "g1" },

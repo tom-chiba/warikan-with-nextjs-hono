@@ -60,6 +60,14 @@ export function UnsettledView({ groupId }: { groupId: string }) {
     });
   }
 
+  // ヘッダーの全選択チェックボックス用（#49）。一覧の全件が選択済みかどうかで表示と
+  // トグル方向（全選択 / 全解除）を決める。items は十分小さい想定なので毎レンダー算出で足りる。
+  const allSelected = items.length > 0 && items.every((i) => selected.has(i.id));
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)));
+  }
+
   function handleDelete(itemId: string, name: string) {
     // 削除確定後は選択セットからも除去する（送金計算に取り残さない）。
     return deleteItem(itemId, name, () => {
@@ -117,7 +125,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
         ) : (
           <ItemsTable
             items={items}
-            selectable={{ selected, onToggle: toggle }}
+            selectable={{ selected, onToggle: toggle, onToggleAll: toggleAll, allSelected }}
             renderActions={(item) => (
               <>
                 <Link
