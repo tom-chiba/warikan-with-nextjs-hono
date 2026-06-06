@@ -13,6 +13,12 @@ vi.mock("./auth-panel", () => ({
   AuthPanel: () => <div>認証パネル</div>,
 }));
 
+// セッション状態表示の文言・導線は session-states.test.tsx が担うため、ここでは配置だけを検証する。
+vi.mock("@/components/session-states", () => ({
+  SessionPending: () => <div>セッション確認中画面</div>,
+  SessionError: () => <div>セッションエラー画面</div>,
+}));
+
 import Home from "./page";
 
 // 各テスト後にレンダリング結果を破棄し、モックの呼び出し履歴もクリアする。
@@ -26,11 +32,25 @@ test("セッション確認中はローディング表示を出す", () => {
 
   render(<Home />);
 
-  expect(screen.getByText("セッション確認中…")).toBeInTheDocument();
+  expect(screen.getByText("セッション確認中画面")).toBeInTheDocument();
+});
+
+test("セッション取得に失敗したらエラー表示を出す", () => {
+  useSessionMock.mockReturnValue({
+    data: null,
+    isPending: false,
+    error: { status: 500 },
+    refetch: vi.fn(),
+  });
+
+  render(<Home />);
+
+  expect(screen.getByText("セッションエラー画面")).toBeInTheDocument();
+  expect(screen.queryByText("認証パネル")).not.toBeInTheDocument();
 });
 
 test("未ログイン時は見出しと認証フォームを表示する", () => {
-  useSessionMock.mockReturnValue({ data: null, isPending: false });
+  useSessionMock.mockReturnValue({ data: null, isPending: false, error: null });
 
   render(<Home />);
 
@@ -42,6 +62,7 @@ test("ログイン済み時はメールアドレスと各導線を表示する",
   useSessionMock.mockReturnValue({
     data: { user: { email: "me@example.com" } },
     isPending: false,
+    error: null,
   });
 
   render(<Home />);
