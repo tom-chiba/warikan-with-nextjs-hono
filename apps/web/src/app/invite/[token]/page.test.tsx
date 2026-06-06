@@ -46,6 +46,14 @@ function renderWithClient(ui: ReactNode) {
 
 const loggedIn = { data: { user: { id: "u1", email: "me@example.com" } }, isPending: false };
 
+test("セッション確認中はローディング表示を出す", () => {
+  useSessionMock.mockReturnValue({ data: null, isPending: true });
+
+  renderWithClient(<InvitePage />);
+
+  expect(screen.getByText("セッション確認中…")).toBeInTheDocument();
+});
+
 test("未ログイン時はサインインのための認証パネルを表示する", () => {
   useSessionMock.mockReturnValue({ data: null, isPending: false });
 
