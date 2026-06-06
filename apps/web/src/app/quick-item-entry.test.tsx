@@ -1,8 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
+import { renderWithClient } from "@/test/render-with-client";
 
 // フォームの入力・検証の詳細は item-form / new/page のテストが担う。
 // ここでは「指定したグループのメンバー取得・保存・導線」が自己完結で動くことを検証する。
@@ -28,11 +27,6 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-
-function renderWithClient(ui: ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
-}
 
 const nowIso = new Date().toISOString();
 

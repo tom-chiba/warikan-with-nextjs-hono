@@ -1,8 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { renderWithClient } from "@/test/render-with-client";
 
 const { useSessionMock, itemGetMock, membersGetMock, putMock, pushMock, searchParamsMock } =
   vi.hoisted(() => ({
@@ -74,11 +73,6 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-
-function renderWithClient(ui: ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
-}
 
 test("既存値がフォームにプリフィルされる", async () => {
   useSessionMock.mockReturnValue(loggedIn);

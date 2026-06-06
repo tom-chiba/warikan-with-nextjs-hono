@@ -1,8 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
+import { renderWithClient } from "@/test/render-with-client";
 
 const { useSessionMock, getMock, acceptMock, pushMock } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
@@ -42,11 +41,6 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-
-function renderWithClient(ui: ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
-}
 
 const loggedIn = { data: { user: { id: "u1", email: "me@example.com" } }, isPending: false };
 

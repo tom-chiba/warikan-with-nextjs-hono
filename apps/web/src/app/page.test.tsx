@@ -1,7 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { renderWithClient } from "@/test/render-with-client";
 
 // auth-client をモックする。vi.hoisted で巻き上げ順の問題を回避する。
 const { useSessionMock, groupsGetMock } = vi.hoisted(() => ({
@@ -47,12 +46,6 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
-
-// useGroups（useQuery）を使うため QueryClientProvider で包む。
-function renderWithClient(ui: ReactNode) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
-}
 
 const loggedIn = {
   data: { user: { email: "me@example.com" } },
