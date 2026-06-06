@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SwRegister } from "@/components/sw-register";
+import { APP_DESCRIPTION, APP_NAME, THEME_COLORS } from "@/lib/app-meta";
 import { Providers } from "./providers";
 
 const geistSans = Geist({
@@ -15,24 +16,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "warikan",
-  description: "割り勘アプリ",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
   // iOS でホーム画面に追加したときにアプリとして全画面起動させる。
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "warikan",
+    title: APP_NAME,
   },
   icons: {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
-// ブラウザ UI のテーマカラー。globals.css の --background と揃える。
+// ブラウザ UI のテーマカラー。
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
   ],
   colorScheme: "light dark",
 };
