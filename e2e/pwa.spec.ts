@@ -10,7 +10,7 @@ test("manifest.webmanifest がインストールに必要な項目を配信す�
   const manifest = await response.json();
   expect(manifest).toMatchObject({
     name: "warikan",
-    start_url: "/groups",
+    start_url: "/",
     scope: "/",
     display: "standalone",
   });
