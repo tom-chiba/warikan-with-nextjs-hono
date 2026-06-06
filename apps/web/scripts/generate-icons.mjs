@@ -1,6 +1,8 @@
 // PWA 用アイコン(PNG)を SVG から生成するスクリプト。
-// デザインを変える場合は buildSvg() を編集して再実行する。
-// 実行: node apps/web/scripts/generate-icons.mjs (ルートの @playwright/test を利用)
+// デザインを変える場合は buildSvg() を編集し、生成された PNG も一緒にコミットすること。
+// 実行: pnpm --filter @warikan/web generate-icons
+// 前提: ルートの @playwright/test を利用するため、Chromium 未取得なら
+//       `pnpm exec playwright install chromium` を先に実行する。
 import { chromium } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
