@@ -21,6 +21,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/app/auth-panel", () => ({
   AuthPanel: () => <div>認証パネル</div>,
 }));
+// セッション状態表示の文言は session-states.test.tsx が担うため、ここでは配置だけを検証する。
+vi.mock("@/components/session-states", () => ({
+  SessionPending: () => <div>セッション確認中画面</div>,
+}));
 vi.mock("@/lib/api-client", () => ({
   apiClient: {
     invitations: {
@@ -51,7 +55,7 @@ test("セッション確認中はローディング表示を出す", () => {
 
   renderWithClient(<InvitePage />);
 
-  expect(screen.getByText("セッション確認中…")).toBeInTheDocument();
+  expect(screen.getByText("セッション確認中画面")).toBeInTheDocument();
 });
 
 test("未ログイン時はサインインのための認証パネルを表示する", () => {
