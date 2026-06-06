@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthPanel } from "@/app/auth-panel";
+import { SessionPending } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 
@@ -36,11 +37,7 @@ export default function InvitePage() {
   });
 
   if (isPending) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-        <p className="text-zinc-500">セッション確認中…</p>
-      </main>
-    );
+    return <SessionPending />;
   }
 
   // メンバーは全員アカウント必須。未ログインならサインイン/サインアップへ誘導する。

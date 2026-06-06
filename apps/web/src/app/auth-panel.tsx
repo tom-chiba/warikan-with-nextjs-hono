@@ -1,32 +1,15 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { signIn, signOut, signUp, useSession } from "@/lib/auth-client";
+import { signIn, signUp } from "@/lib/auth-client";
 
+// サインアップ/サインインのフォーム。セッション状態による出し分けは呼び出し側で行う。
 export function AuthPanel() {
-  const { data: session, isPending } = useSession();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  if (isPending) {
-    return <p className="text-zinc-500">セッション確認中…</p>;
-  }
-
-  if (session) {
-    return (
-      <div className="flex flex-col items-center gap-3">
-        <p>
-          ログイン中: <span className="font-mono">{session.user.email}</span>
-        </p>
-        <button type="button" onClick={() => signOut()} className="rounded-md border px-4 py-1">
-          サインアウト
-        </button>
-      </div>
-    );
-  }
 
   async function handleSignUp(e: FormEvent) {
     e.preventDefault();

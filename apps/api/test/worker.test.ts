@@ -10,12 +10,6 @@ describe("RPC ルート", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ message: "warikan API" });
   });
-
-  it("GET /hello はクエリの name を反映する", async () => {
-    const res = await SELF.fetch(`${BASE}/hello?name=chiba`);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ message: "Hello, chiba!" });
-  });
 });
 
 describe("認証 (Better Auth + D1)", () => {

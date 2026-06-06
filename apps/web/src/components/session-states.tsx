@@ -11,6 +11,18 @@ export function SessionPending() {
   );
 }
 
+// セッション取得に失敗したときの表示。再試行は呼び出し側の refetch を受け取る。
+export function SessionError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
+      <p className="text-red-500">セッションの確認に失敗しました。</p>
+      <button type="button" onClick={onRetry} className="rounded-md border px-4 py-2">
+        再試行
+      </button>
+    </main>
+  );
+}
+
 // 未ログイン時のサインイン導線。文言はページごとに変えられるよう message で差し替え可能。
 export function SignInPrompt({
   message = "このページを利用するにはサインインが必要です。",
