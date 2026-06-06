@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* --background は src/lib/app-meta.ts の THEME_COLORS と手動で同期すること。 */
 :root {
   --background: #ffffff;
   --foreground: #171717;

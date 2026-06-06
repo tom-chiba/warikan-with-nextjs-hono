@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SessionError, SessionPending } from "@/components/session-states";
+import { APP_NAME } from "@/lib/app-meta";
 import { signOut, useSession } from "@/lib/auth-client";
 import { AuthPanel } from "./auth-panel";
 
@@ -22,7 +23,7 @@ export default function Home() {
   // SignInPrompt（@/components/session-states）が href="/" でここへ誘導するため、この導線は維持する。
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-2xl font-semibold">warikan</h1>
+      <h1 className="text-2xl font-semibold">{APP_NAME}</h1>
       {session ? (
         <>
           <p>
