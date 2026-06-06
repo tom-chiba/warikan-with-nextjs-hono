@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 test("マウント時に registerServiceWorker を一度だけ呼ぶ", () => {
-  registerServiceWorkerMock.mockResolvedValue({ status: "registered" });
+  registerServiceWorkerMock.mockResolvedValue(undefined);
 
   render(<SwRegister />);
 
@@ -25,7 +25,7 @@ test("マウント時に registerServiceWorker を一度だけ呼ぶ", () => {
 });
 
 test("何も描画しない", () => {
-  registerServiceWorkerMock.mockResolvedValue({ status: "skipped-dev" });
+  registerServiceWorkerMock.mockResolvedValue(undefined);
 
   const { container } = render(<SwRegister />);
 

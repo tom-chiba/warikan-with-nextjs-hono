@@ -8,37 +8,35 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("開発環境では登録をスキップする", async () => {
+test("開発環境では登録しない", async () => {
   vi.stubEnv("NODE_ENV", "development");
+  const register = vi.fn();
+  vi.stubGlobal("navigator", { serviceWorker: { register } });
 
-  const result = await registerServiceWorker();
+  await registerServiceWorker();
 
-  expect(result.status).toBe("skipped-dev");
+  expect(register).not.toHaveBeenCalled();
 });
 
-test("Service Worker API がない環境では unsupported を返す", async () => {
+test("Service Worker API がない環境では何もしない", async () => {
   vi.stubEnv("NODE_ENV", "production");
   // jsdom の navigator から serviceWorker を除いて未対応ブラウザを模倣する。
   vi.stubGlobal("navigator", {});
 
-  const result = await registerServiceWorker();
-
-  expect(result.status).toBe("unsupported");
+  await expect(registerServiceWorker()).resolves.toBeUndefined();
 });
 
-test("本番環境では /sw.js を登録して registered を返す", async () => {
+test("本番環境では /sw.js を登録する", async () => {
   vi.stubEnv("NODE_ENV", "production");
-  const registration = { scope: "/" };
-  const register = vi.fn().mockResolvedValue(registration);
+  const register = vi.fn().mockResolvedValue({ scope: "/" });
   vi.stubGlobal("navigator", { serviceWorker: { register } });
 
-  const result = await registerServiceWorker();
+  await registerServiceWorker();
 
   expect(register).toHaveBeenCalledWith("/sw.js", { scope: "/", updateViaCache: "none" });
-  expect(result).toEqual({ status: "registered", registration });
 });
 
-test("登録に失敗しても例外を投げず error を返す", async () => {
+test("登録に失敗しても例外を投げず console.error で報告する", async () => {
   vi.stubEnv("NODE_ENV", "production");
   const error = new Error("SecurityError");
   const register = vi.fn().mockRejectedValue(error);
@@ -46,8 +44,7 @@ test("登録に失敗しても例外を投げず error を返す", async () => {
   // 失敗時の console.error はテスト出力を汚さないよう抑止する。
   const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
-  const result = await registerServiceWorker();
+  await expect(registerServiceWorker()).resolves.toBeUndefined();
 
-  expect(result).toEqual({ status: "error", error });
-  expect(consoleError).toHaveBeenCalled();
+  expect(consoleError).toHaveBeenCalledWith("Service Worker の登録に失敗しました:", error);
 });
