@@ -19,7 +19,8 @@ export default function GroupsPage() {
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
-  const { data: groupsData, isPending: groupsLoading, isError: groupsError } = useGroups(!!session);
+  // isPending は enabled: false（未ログイン）でも true になるため、実際に取得中かは isLoading で見る。
+  const { data: groupsData, isLoading: groupsLoading, isError: groupsError } = useGroups(!!session);
 
   if (isPending) {
     return <SessionPending />;
