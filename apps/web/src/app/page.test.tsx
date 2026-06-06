@@ -101,6 +101,8 @@ test("ログイン済み時はメールアドレスと各導線を表示する",
 
   renderWithClient(<Home />);
 
+  // グループ取得の完了まで待ち、確定後の画面に対して検証する。
+  await screen.findByRole("link", { name: "グループを作成" });
   expect(screen.getByText("me@example.com")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "グループ" })).toHaveAttribute("href", "/groups");
   expect(screen.getByRole("link", { name: "アカウント設定" })).toHaveAttribute("href", "/settings");

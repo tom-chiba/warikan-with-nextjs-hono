@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { SessionError, SessionPending } from "@/components/session-states";
 import { APP_NAME } from "@/lib/app-meta";
@@ -10,10 +11,12 @@ import { QuickItemEntry } from "./quick-item-entry";
 
 export default function Home() {
   const { data: session, isPending, error, refetch } = useSession();
+  const queryClient = useQueryClient();
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
-  const { data: groupsData, isPending: groupsLoading, isError: groupsError } = useGroups(!!session);
+  // isPending は enabled: false（未ログイン）でも true になるため、実際に取得中かは isLoading で見る。
+  const { data: groupsData, isLoading: groupsLoading, isError: groupsError } = useGroups(!!session);
 
   if (isPending) {
     return <SessionPending />;
@@ -77,7 +80,11 @@ export default function Home() {
           </div>
           <button
             type="button"
-            onClick={() => signOut()}
+            onClick={async () => {
+              await signOut();
+              // 前のユーザーのグループ等が次のサインインで一瞬表示されないよう、キャッシュごと破棄する。
+              queryClient.clear();
+            }}
             className="text-sm text-zinc-500 underline"
           >
             サインアウト

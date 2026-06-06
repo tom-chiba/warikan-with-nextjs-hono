@@ -10,7 +10,7 @@ import { ItemForm, type ItemFormValues } from "./groups/[groupId]/items/item-for
 // グループの選び方（現状は「所属が 1 件ならそのグループ」）は呼び出し側の責務。
 export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupName: string }) {
   // ログイン済みの文脈でのみ描画される前提のため、常に取得する。
-  const { data: membersData } = useGroupMembers(groupId, true);
+  const { data: membersData, isError: membersError } = useGroupMembers(groupId, true);
   const members = membersData?.members ?? [];
 
   async function handleSubmit(values: ItemFormValues) {
@@ -36,13 +36,18 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
           購入品一覧
         </Link>
       </div>
-      <ItemForm
-        members={members}
-        submitLabel="保存"
-        resetAfterSubmit
-        successMessage="保存しました。続けて入力できます。"
-        onSubmit={handleSubmit}
-      />
+      {membersError ? (
+        // members が空のままだと ItemForm が「読み込み中」を出し続けるため、失敗は明示する。
+        <p className="text-sm text-red-500">メンバー一覧の取得に失敗しました。</p>
+      ) : (
+        <ItemForm
+          members={members}
+          submitLabel="保存"
+          resetAfterSubmit
+          successMessage="保存しました。続けて入力できます。"
+          onSubmit={handleSubmit}
+        />
+      )}
     </section>
   );
 }

@@ -97,6 +97,14 @@ test("保存すると指定グループへ POST し、成功メッセージを�
   expect(await screen.findByText("保存しました。続けて入力できます。")).toBeInTheDocument();
 });
 
+test("メンバー一覧の取得に失敗したらエラーを表示し、フォームは出さない", async () => {
+  membersGetMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+  renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
+
+  expect(await screen.findByText("メンバー一覧の取得に失敗しました。")).toBeInTheDocument();
+  expect(screen.queryByLabelText("購入品名")).not.toBeInTheDocument();
+});
+
 test("保存時に 401 が返るとセッション切れメッセージを表示する", async () => {
   setTwoMembers();
   itemsPostMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
