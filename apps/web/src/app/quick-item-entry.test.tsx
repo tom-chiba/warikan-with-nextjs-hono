@@ -1,0 +1,114 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { afterEach, expect, test, vi } from "vitest";
+
+// フォームの入力・検証の詳細は item-form / new/page のテストが担う。
+// ここでは「指定したグループのメンバー取得・保存・導線」が自己完結で動くことを検証する。
+const { membersGetMock, itemsPostMock } = vi.hoisted(() => ({
+  membersGetMock: vi.fn(),
+  itemsPostMock: vi.fn(),
+}));
+
+vi.mock("@/lib/api-client", () => ({
+  apiClient: {
+    groups: {
+      ":groupId": {
+        members: { $get: (...args: unknown[]) => membersGetMock(...args) },
+        items: { $post: (...args: unknown[]) => itemsPostMock(...args) },
+      },
+    },
+  },
+}));
+
+import { QuickItemEntry } from "./quick-item-entry";
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+function renderWithClient(ui: ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
+const nowIso = new Date().toISOString();
+
+// メンバー 2 名（わたし / ともだち）を返すデフォルト。
+function setTwoMembers() {
+  membersGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      members: [
+        { userId: "u1", name: "わたし", email: "me@example.com", role: "owner", joinedAt: nowIso },
+        {
+          userId: "u2",
+          name: "ともだち",
+          email: "f@example.com",
+          role: "member",
+          joinedAt: nowIso,
+        },
+      ],
+    }),
+  });
+}
+
+test("グループ名の見出し・購入品一覧への導線・入力フォームを表示する", async () => {
+  setTwoMembers();
+  renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
+
+  expect(screen.getByRole("heading", { name: "旅行 に購入品を入力" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "購入品一覧" })).toHaveAttribute(
+    "href",
+    "/groups/g1/items",
+  );
+  expect(await screen.findByLabelText("わたし の支払額")).toBeInTheDocument();
+  expect(membersGetMock).toHaveBeenCalledWith({ param: { groupId: "g1" } });
+});
+
+test("保存すると指定グループへ POST し、成功メッセージを表示する", async () => {
+  setTwoMembers();
+  itemsPostMock.mockResolvedValue({ ok: true, json: async () => ({ id: "item1" }) });
+  renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
+
+  await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
+  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  await waitFor(() => {
+    expect(itemsPostMock).toHaveBeenCalledWith({
+      param: { groupId: "g1" },
+      json: {
+        name: "ランチ",
+        purchasedOn: null,
+        memo: null,
+        payments: [{ userId: "u1", amount: 1000 }],
+        shares: [
+          { userId: "u1", amount: 500 },
+          { userId: "u2", amount: 500 },
+        ],
+      },
+    });
+  });
+  expect(await screen.findByText("保存しました。続けて入力できます。")).toBeInTheDocument();
+});
+
+test("保存時に 401 が返るとセッション切れメッセージを表示する", async () => {
+  setTwoMembers();
+  itemsPostMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+  renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
+
+  await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
+  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(
+    await screen.findByText("セッションが切れました。再度サインインしてください。"),
+  ).toBeInTheDocument();
+});
