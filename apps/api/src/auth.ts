@@ -5,6 +5,7 @@ import { eq, notExists } from "drizzle-orm";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
 import { group, groupMember } from "./db/schema";
+import { testPasswordHasher } from "./internal/test-password-hasher";
 
 // D1 バインディングや secret は実行時 env から渡るため、
 // auth インスタンスはシングルトンにせずリクエストごとに生成する。
@@ -23,6 +24,11 @@ export function createAuth(env: Env) {
     }),
     emailAndPassword: {
       enabled: true,
+      // テスト時のみ scrypt を SHA-256 に差し替えてテストを高速化する(#42 / ADR-0012)。
+      // TEST_HASH は vitest.config.ts の miniflare.bindings でのみ注入され、
+      // 本番 wrangler.jsonc には存在しないため常に undefined = scrypt のまま。
+      // "0" や "false" の誤設定で有効化されないよう truthy 判定ではなく "1" と厳密比較する。
+      ...(env.TEST_HASH === "1" ? { password: testPasswordHasher } : {}),
     },
     hooks: {
       // Better Auth の /delete-user はパスワード未指定（空文字含む）だと fresh session
