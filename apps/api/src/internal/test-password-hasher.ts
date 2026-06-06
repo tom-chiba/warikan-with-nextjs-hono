@@ -16,12 +16,16 @@ async function sha256Hex(input: string): Promise<string> {
     .join("");
 }
 
+async function hashPassword(password: string): Promise<string> {
+  return `test:${await sha256Hex(password)}`;
+}
+
 // Better Auth の emailAndPassword.password が要求する { hash, verify } インターフェース。
+// Better Auth は hash/verify を自前の context オブジェクトに移し替えて呼ぶため(this が
+// このオブジェクトを指さない)、this 経由ではなくモジュールスコープの関数を直接参照する。
 export const testPasswordHasher = {
-  async hash(password: string): Promise<string> {
-    return `test:${await sha256Hex(password)}`;
-  },
+  hash: hashPassword,
   async verify({ hash, password }: { hash: string; password: string }): Promise<boolean> {
-    return hash === (await this.hash(password));
+    return hash === (await hashPassword(password));
   },
 };
