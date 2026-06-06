@@ -65,7 +65,11 @@ export function UnsettledView({ groupId }: { groupId: string }) {
   const allSelected = items.length > 0 && items.every((i) => selected.has(i.id));
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)));
+    // toggle と同じく関数型更新で常に最新の選択状態からトグル方向を決める。
+    setSelected((prev) => {
+      const all = items.length > 0 && items.every((i) => prev.has(i.id));
+      return all ? new Set<string>() : new Set(items.map((i) => i.id));
+    });
   }
 
   function handleDelete(itemId: string, name: string) {
