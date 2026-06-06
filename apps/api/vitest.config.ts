@@ -29,7 +29,8 @@ export default defineConfig(async () => {
             // フォールバックして CSRF 403 になるため、テストではここで固定する。
             WEB_ORIGIN: "http://localhost:3000",
             // パスワードハッシュを scrypt から SHA-256 に差し替えてテストを高速化する
-            // (#42 / ADR-0012)。値は任意の truthy 文字列。本番には存在しないキー。
+            // (#42 / ADR-0012)。auth.ts は "1" との厳密比較で有効化を判定する。
+            // 本番には存在しないキー。
             TEST_HASH: "1",
           },
         },

@@ -30,7 +30,7 @@ api のテスト（[ADR-0008](./0008-testing-strategy.md)）は実 workerd 上�
 実装の構造:
 
 - `src/internal/test-password-hasher.ts` に SHA-256 ハッシャーを分離する。ハッシュ値は `test:` プレフィックス付きで、本番の scrypt verify とは互換性がない。万一テストデータが本番 DB に混入しても必ずログイン失敗になるフェイルセーフ
-- `createAuth(env)` は `env.TEST_HASH` が truthy のときのみ `password` を差し替える。`TEST_HASH` は `apps/api/vitest.config.ts` の `miniflare.bindings` でのみ注入し、本番 `wrangler.jsonc` の vars / `wrangler secret` には追加しない（キーが存在しない = 常に scrypt）
+- `createAuth(env)` は `env.TEST_HASH` が `"1"` のときのみ `password` を差し替える（wrangler の env は文字列のため、`"0"` / `"false"` 等の誤設定でも有効化されないよう truthy 判定ではなく厳密比較にする）。`TEST_HASH` は `apps/api/vitest.config.ts` の `miniflare.bindings` でのみ注入し、本番 `wrangler.jsonc` の vars / `wrangler secret` には追加しない（キーが存在しない = 常に scrypt）
 
 不採用の理由:
 
