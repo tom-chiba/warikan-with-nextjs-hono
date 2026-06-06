@@ -124,7 +124,9 @@ export default function GroupPage() {
       }
       if (isSelf) {
         // 退出したらこのグループの画面には留まれないため一覧へ戻る。
-        await queryClient.invalidateQueries({ queryKey: ["groups"] });
+        // この画面では ["groups"] のオブザーバが居ない（非アクティブ）ため、refetchType: "all" で
+        // その場で再取得まで済ませる。ルート（/）が退出済みグループのクイック入力を出すのを防ぐ。
+        await queryClient.invalidateQueries({ queryKey: ["groups"], refetchType: "all" });
         router.push("/groups");
         return;
       }

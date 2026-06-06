@@ -61,7 +61,9 @@ export default function InvitePage() {
         throw new Error("参加に失敗しました。リンクが無効か期限切れの可能性があります。");
       }
       const { groupId } = await res.json();
-      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      // この画面では ["groups"] のオブザーバが居ない（非アクティブ）ため、refetchType: "all" で
+      // その場で再取得まで済ませる。ルート（/）が古い件数でクイック入力を出し分けるのを防ぐ。
+      await queryClient.invalidateQueries({ queryKey: ["groups"], refetchType: "all" });
       router.push(`/groups/${groupId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "参加に失敗しました");

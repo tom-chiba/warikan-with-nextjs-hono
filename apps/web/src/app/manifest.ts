@@ -9,10 +9,9 @@ export default function manifest(): MetadataRoute.Manifest {
     name: APP_NAME,
     short_name: APP_NAME,
     description: APP_DESCRIPTION,
-    // ログイン済みユーザーの作業起点であるグループ一覧から起動する。
-    start_url: "/groups",
-    // scope を省略すると start_url から /groups/ が導出され、
-    // / や /invite などがスタンドアロン表示から外れてしまうため明示する。
+    // ルートはログイン済みなら購入品クイック入力を直接表示する(#45)ため、起動もルートにする。
+    start_url: "/",
+    // start_url からの導出に頼らず、アプリ全体をスコープとして明示する。
     scope: "/",
     display: "standalone",
     background_color: THEME_COLORS.light,

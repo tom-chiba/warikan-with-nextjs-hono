@@ -1,12 +1,13 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
+import { useGroups } from "@/lib/use-groups";
 
 export default function GroupsPage() {
   const { data: session, isPending } = useSession();
@@ -18,21 +19,8 @@ export default function GroupsPage() {
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
-  const {
-    data: groupsData,
-    isPending: groupsLoading,
-    isError: groupsError,
-  } = useQuery({
-    queryKey: ["groups"],
-    enabled: !!session,
-    queryFn: async () => {
-      const res = await apiClient.groups.$get();
-      if (!res.ok) {
-        throw new Error("グループ一覧の取得に失敗しました");
-      }
-      return res.json();
-    },
-  });
+  // isPending は enabled: false（未ログイン）でも true になるため、実際に取得中かは isLoading で見る。
+  const { data: groupsData, isLoading: groupsLoading, isError: groupsError } = useGroups(!!session);
 
   if (isPending) {
     return <SessionPending />;
