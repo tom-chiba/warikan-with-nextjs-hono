@@ -1,0 +1,1 @@
+CREATE INDEX `item_group_id_status_created_at_idx` ON `item` (`group_id`,`status`,`created_at`);
