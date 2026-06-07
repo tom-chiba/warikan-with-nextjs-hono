@@ -1,10 +1,13 @@
 // グループ一覧ルート（routes/groups-collection.ts）から切り出した純粋関数。
 // DB・Hono コンテキストに依存しないカレントグループ判定を単体テスト可能にする。
 
+import type { groupMember } from "../db/schema";
+
 export type GroupListRow = {
   id: string;
   name: string;
-  role: "owner" | "member";
+  // role の取りうる値はスキーマの enum から導出し、enum 変更時にここを手で追従させない。
+  role: (typeof groupMember.$inferSelect)["role"];
   lastViewedAt: Date | null;
 };
 
