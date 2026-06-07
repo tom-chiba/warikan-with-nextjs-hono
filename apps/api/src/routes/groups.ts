@@ -17,6 +17,31 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const groups = new Hono<{
   Variables: GroupMemberVariables & DbVariables;
 }>()
+  // グループ名を変更する（#65）。メンバー削除の他者削除と同様に owner のみ可。
+  // パスは /groups/:groupId 自体（サブパスなし）だが、index.ts の app.use("/groups/:groupId/*")
+  // は末尾ワイルドカードが空にもマッチするため、このルートにも requireGroupMember が適用される
+  //（非メンバー 403 はテストで担保）。name のバリデーションは作成（groups-collection）と同一。
+  // updated_at は $defaultFn が INSERT 時にしか効かないため UPDATE で明示的に更新する。
+  .patch(
+    "/:groupId",
+    zValidator("json", z.object({ name: z.string().trim().min(1).max(100) })),
+    async (c) => {
+      const member = c.get("groupMember");
+      const db = c.get("db");
+      const { name } = c.req.valid("json");
+
+      if (member.role !== "owner") {
+        return c.json({ error: "Forbidden" }, 403);
+      }
+
+      await db
+        .update(group)
+        .set({ name, updatedAt: new Date() })
+        .where(eq(group.id, member.groupId));
+
+      return c.json({ ok: true });
+    },
+  )
   // このグループを「最後に開いた」として記録する（カレントグループの更新、#51）。
   // メンバーシップは requireGroupMember で検証済みのため、自分のメンバーシップ行の
   // last_viewed_at を打つだけでよい。GET /groups が最大値の行をカレントとして返す。
