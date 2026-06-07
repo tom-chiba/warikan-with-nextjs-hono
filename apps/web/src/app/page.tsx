@@ -47,7 +47,12 @@ export default function Home() {
 
   return (
     <main className="flex flex-1 flex-col items-center gap-6 p-8">
-      <MainNav groups={groups} selectedGroupId={currentGroup?.id ?? null} activeTab="entry" />
+      <MainNav
+        groups={groups}
+        selectedGroupId={currentGroup?.id ?? null}
+        activeTab="entry"
+        loading={groupsLoading}
+      />
       {groupsLoading && <p className="text-zinc-500">グループを読み込み中…</p>}
       {groupsError && <p className="text-sm text-red-500">グループ一覧の取得に失敗しました。</p>}
       {groupsReady && groups.length === 0 && (

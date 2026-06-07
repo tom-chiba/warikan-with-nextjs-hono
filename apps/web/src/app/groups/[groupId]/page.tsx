@@ -145,8 +145,6 @@ export default function GroupPage() {
         グループ ID: <span className="font-mono">{groupId}</span>
       </p>
 
-      {/* 購入品の入力・一覧は MainNav のあるメインページが担う（このページは設定動線、#51）。 */}
-
       {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
       {(error || fetchError) && (
         <p className="w-full max-w-md text-sm text-red-500">
@@ -246,9 +244,16 @@ export default function GroupPage() {
         )}
       </section>
 
-      <Link href="/groups" className="rounded-md border px-4 py-2">
-        グループ一覧へ
-      </Link>
+      {/* 入力・一覧の常設ナビはメインページが担うが、設定動線からこのグループの明細へ
+          直接移れるよう一覧へのショートカットだけ残す（開くとカレントグループも切り替わる）。 */}
+      <div className="flex gap-2">
+        <Link href={`/groups/${groupId}/items`} className="rounded-md border px-4 py-2">
+          購入品一覧
+        </Link>
+        <Link href="/groups" className="rounded-md border px-4 py-2">
+          グループ一覧へ
+        </Link>
+      </div>
     </main>
   );
 }

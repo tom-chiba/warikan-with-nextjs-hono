@@ -21,8 +21,8 @@ afterEach(() => {
 });
 
 const groups = [
-  { id: "g1", name: "旅行", role: "owner" },
-  { id: "g2", name: "飲み会", role: "member" },
+  { id: "g1", name: "旅行", role: "owner" as const },
+  { id: "g2", name: "飲み会", role: "member" as const },
 ];
 
 test("currentGroupId が一覧にあればそのグループを返す", () => {

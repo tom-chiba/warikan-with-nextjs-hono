@@ -12,12 +12,33 @@ type Props = {
   // 表示中のグループ。/ ではカレントグループ、items ページでは URL のグループを渡す。
   selectedGroupId: string | null;
   activeTab: MainNavTab;
+  // グループ一覧の取得中フラグ。取得完了まで「グループなし」と断定しないために使う。
+  loading?: boolean;
 };
+
+// 歯車アイコン（Feather: settings）。アイコンライブラリは追加せずインラインで持ち、
+// 静的な SVG ノードなのでモジュールレベルに巻き上げて再レンダー時の再生成を避ける。
+const gearIcon = (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+  </svg>
+);
 
 // メイン 3 ページ（入力 / 未精算 / 精算済）の常設ナビゲーション（#51）。
 // ヘッダー行にグループ切替セレクタと設定（歯車）リンク、その下に 3 タブを置く。
 // グループ管理・アカウント設定は日常動線から外し、歯車 → /settings に集約する。
-export function MainNav({ groups, selectedGroupId, activeTab }: Props) {
+export function MainNav({ groups, selectedGroupId, activeTab, loading = false }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -34,6 +55,10 @@ export function MainNav({ groups, selectedGroupId, activeTab }: Props) {
 
   const tabClass = (active: boolean) =>
     `rounded-md border px-4 py-2 ${active ? "bg-black text-white dark:bg-white dark:text-black" : ""}`;
+
+  // 表示名: 取得中や名前が引けない間（取得失敗時の items ページ等）は控えめなプレースホルダにし、
+  // 「グループなし」は取得が完了して本当に所属 0 件のときだけ出す。
+  const selectedName = groups.find((g) => g.id === selectedGroupId)?.name;
 
   return (
     <header className="flex w-full max-w-md flex-col gap-3">
@@ -53,25 +78,11 @@ export function MainNav({ groups, selectedGroupId, activeTab }: Props) {
           </select>
         ) : (
           <span className="truncate text-lg font-medium">
-            {groups.find((g) => g.id === selectedGroupId)?.name ?? "グループなし"}
+            {selectedName ?? (loading || selectedGroupId ? "…" : "グループなし")}
           </span>
         )}
         <Link href="/settings" aria-label="設定" className="shrink-0 rounded-md border p-2">
-          {/* 歯車アイコン（Feather: settings）。アイコンライブラリは追加せずインラインで持つ。 */}
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
+          {gearIcon}
         </Link>
       </div>
       <nav aria-label="メインナビゲーション" className="flex gap-2">

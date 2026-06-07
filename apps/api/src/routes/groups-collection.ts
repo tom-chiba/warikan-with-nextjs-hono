@@ -54,18 +54,18 @@ export const groupsCollection = new Hono<{
 
     // カレントグループ = 最後に開いたグループ（last_viewed_at が最大の行）。一度も記録がなければ null。
     // 一覧取得に同梱することで、カレント解決のための追加の往復を発生させない（#51）。
+    // 一覧の整形（lastViewedAt を外す）とカレント判定は 1 回の走査でまとめて行う。
+    const groups: Pick<(typeof rows)[number], "id" | "name" | "role">[] = [];
     let currentGroupId: string | null = null;
     let latest = 0;
-    for (const row of rows) {
-      const viewedAt = row.lastViewedAt?.getTime() ?? 0;
+    for (const { id, name, role, lastViewedAt } of rows) {
+      groups.push({ id, name, role });
+      const viewedAt = lastViewedAt?.getTime() ?? 0;
       if (viewedAt > latest) {
         latest = viewedAt;
-        currentGroupId = row.id;
+        currentGroupId = id;
       }
     }
 
-    return c.json({
-      groups: rows.map(({ id, name, role }) => ({ id, name, role })),
-      currentGroupId,
-    });
+    return c.json({ groups, currentGroupId });
   });

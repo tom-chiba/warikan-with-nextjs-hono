@@ -22,10 +22,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const oneGroup = [{ id: "g1", name: "旅行", role: "owner" }];
+const oneGroup = [{ id: "g1", name: "旅行", role: "owner" as const }];
 const twoGroups = [
-  { id: "g1", name: "旅行", role: "owner" },
-  { id: "g2", name: "飲み会", role: "member" },
+  { id: "g1", name: "旅行", role: "owner" as const },
+  { id: "g2", name: "飲み会", role: "member" as const },
 ];
 
 test("3 タブと設定リンクを表示し、一覧タブは選択中グループの URL を指す", () => {
@@ -53,6 +53,22 @@ test("グループが 0 件のときは一覧タブを不活性にする", () =>
   expect(screen.getByText("グループなし")).toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "未精算" })).not.toBeInTheDocument();
   expect(screen.getByText("未精算")).toHaveAttribute("aria-disabled", "true");
+});
+
+test("一覧の取得中は「グループなし」と断定せずプレースホルダを出す", () => {
+  renderWithClient(<MainNav groups={[]} selectedGroupId={null} activeTab="entry" loading />);
+
+  expect(screen.getByText("…")).toBeInTheDocument();
+  expect(screen.queryByText("グループなし")).not.toBeInTheDocument();
+});
+
+test("名前が引けない選択中グループ（取得失敗時等）もプレースホルダを出す", () => {
+  renderWithClient(<MainNav groups={[]} selectedGroupId="g1" activeTab="unsettled" />);
+
+  expect(screen.getByText("…")).toBeInTheDocument();
+  expect(screen.queryByText("グループなし")).not.toBeInTheDocument();
+  // タブは URL 由来の selectedGroupId で常に活性。
+  expect(screen.getByRole("link", { name: "未精算" })).toHaveAttribute("href", "/groups/g1/items");
 });
 
 test("セレクタで切り替えるとカレントグループを記録する（入力タブでは遷移しない）", async () => {
