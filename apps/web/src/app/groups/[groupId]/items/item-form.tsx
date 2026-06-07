@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { distributeEqually } from "@warikan/domain";
+import { formatAmount } from "@/lib/format";
 
 // 購入品の入力フォーム（新規 #4 / 編集 #20 で共通利用）。
 // 支払額・割勘金額の入力、等分、「残りをここに」、合計・過不足表示、保存可否の判定を内包する。
@@ -209,7 +210,7 @@ export function ItemForm({
             <div className="section-rule flex items-baseline justify-between">
               <h2 className="section-title">支払額</h2>
               <span className="text-sm font-bold tabular-nums">
-                合計 {paymentTotal.toLocaleString()} 円
+                合計 {formatAmount(paymentTotal)} 円
               </span>
             </div>
             <ul className="flex flex-col gap-2">
@@ -235,7 +236,7 @@ export function ItemForm({
             <div className="section-rule flex items-baseline justify-between">
               <h2 className="section-title">割勘金額</h2>
               <span className="text-sm font-bold tabular-nums">
-                合計 {shareTotal.toLocaleString()} 円
+                合計 {formatAmount(shareTotal)} 円
               </span>
             </div>
             <label className="flex items-center gap-2 text-sm">

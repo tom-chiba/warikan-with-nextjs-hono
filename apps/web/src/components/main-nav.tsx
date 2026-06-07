@@ -35,6 +35,16 @@ const gearIcon = (
   </svg>
 );
 
+// 下線タブ（エディトリアル・シャープ, Issue #38）。アクティブは太い墨色の下線 + 強い字、
+// 非アクティブは透明下線で高さを揃え、ホバーで文字色だけ立てる。
+// active のみに依存する純関数なのでモジュールレベルに置き、レンダーごとの再生成を避ける。
+const tabClass = (active: boolean) =>
+  `-mb-px border-b-3 px-1 pb-2 text-sm tracking-wide transition-colors ${
+    active
+      ? "border-ink font-extrabold text-ink"
+      : "border-transparent font-bold text-muted hover:text-ink"
+  }`;
+
 // メイン 3 ページ（入力 / 未精算 / 精算済）の常設ナビゲーション（#51）。
 // ヘッダー行にグループ切替セレクタと設定（歯車）リンク、その下に 3 タブを置く。
 // グループ管理・アカウント設定は日常動線から外し、歯車 → /settings に集約する。
@@ -52,15 +62,6 @@ export function MainNav({ groups, selectedGroupId, activeTab, loading = false }:
       router.push(`/groups/${nextId}/items?status=settled`);
     }
   }
-
-  // 下線タブ（エディトリアル・シャープ, Issue #38）。アクティブは太い墨色の下線 + 強い字、
-  // 非アクティブは透明下線で高さを揃え、ホバーで文字色だけ立てる。
-  const tabClass = (active: boolean) =>
-    `-mb-px border-b-3 px-1 pb-2 text-sm tracking-wide transition-colors ${
-      active
-        ? "border-ink font-extrabold text-ink"
-        : "border-transparent font-bold text-muted hover:text-ink"
-    }`;
 
   // 表示名: 取得中や名前が引けない間（取得失敗時の items ページ等）は控えめなプレースホルダにし、
   // 「グループなし」は取得が完了して本当に所属 0 件のときだけ出す。

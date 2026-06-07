@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { computeSettlements } from "@warikan/domain";
+import { formatAmount } from "@/lib/format";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemsTable } from "./items-table";
 import { useItemActions } from "./use-item-actions";
@@ -179,7 +180,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
                   <span>
                     {nameOf(t.from)} → {nameOf(t.to)}
                   </span>
-                  <span className="font-bold tabular-nums">{t.amount.toLocaleString()} 円</span>
+                  <span className="font-bold tabular-nums">{formatAmount(t.amount)} 円</span>
                 </li>
               ))}
             </ul>

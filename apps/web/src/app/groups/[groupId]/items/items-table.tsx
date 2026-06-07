@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { formatAmount } from "@/lib/format";
 import { IndeterminateCheckbox } from "./indeterminate-checkbox";
 
 // 一覧テーブルの行に必要な最小限のアイテム情報。
@@ -28,14 +29,16 @@ type Props = {
   renderActions: (item: ItemRowData) => ReactNode;
 };
 
+// 見出し行は太罫線・小さめの強い字、本文行は細罫線で帳簿らしく組む（Issue #38）。
+// 見出し・日付・金額は折り返さず、モバイル幅では操作ボタン側が flex-wrap で逃げる。
+// 静的な文字列なのでモジュールレベルに置き、レンダーごとの再生成を避ける。
+const headClass = "whitespace-nowrap py-2 text-xs font-bold tracking-widest text-muted";
+
 // 未精算・精算済の両ビューで共有するアイテム一覧テーブル（Issue #23: 見た目の共通化）。
 export function ItemsTable({ items, selectable, renderActions }: Props) {
   // 一部選択（indeterminate 表示）の判定。selected に一覧外の id が残っていても
   // 影響を受けないよう、表示中の items を基準に導出する。
   const someSelected = !!selectable && items.some((i) => selectable.selected.has(i.id));
-  // 見出し行は太罫線・小さめの強い字、本文行は細罫線で帳簿らしく組む（Issue #38）。
-  // 見出し・日付・金額は折り返さず、モバイル幅では操作ボタン側が flex-wrap で逃げる。
-  const headClass = "whitespace-nowrap py-2 text-xs font-bold tracking-widest text-muted";
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -75,7 +78,7 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
               {item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}
             </td>
             <td className="whitespace-nowrap py-2.5 pr-4 text-right font-bold tabular-nums">
-              {item.total.toLocaleString()} 円
+              {formatAmount(item.total)} 円
             </td>
             <td className="py-2.5 text-right">
               <span className="flex flex-wrap justify-end gap-1.5">{renderActions(item)}</span>
