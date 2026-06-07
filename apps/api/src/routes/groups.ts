@@ -1,7 +1,8 @@
 import { and, desc, eq, gt, isNull, notExists } from "drizzle-orm";
 import { Hono } from "hono";
 import type { DbVariables, GroupMemberVariables } from "../context";
-import { group, groupInvitation, groupMember, user } from "../db/schema";
+import { group, groupInvitation, groupMember } from "../db/schema";
+import { selectGroupMembers } from "../lib/group-members";
 import { generateInvitationToken } from "../lib/token";
 
 // 招待リンクの有効期限（発行から 7 日間）。
@@ -33,22 +34,7 @@ export const groups = new Hono<{
     const member = c.get("groupMember");
     const db = c.get("db");
 
-    const members = await db
-      .select({
-        userId: groupMember.userId,
-        name: user.name,
-        email: user.email,
-        role: groupMember.role,
-        joinedAt: groupMember.joinedAt,
-      })
-      .from(groupMember)
-      .innerJoin(user, eq(groupMember.userId, user.id))
-      .where(eq(groupMember.groupId, member.groupId))
-      .orderBy(groupMember.joinedAt);
-
-    return c.json({
-      members: members.map((m) => ({ ...m, joinedAt: m.joinedAt.toISOString() })),
-    });
+    return c.json({ members: await selectGroupMembers(db, member.groupId) });
   })
   // メンバーを削除（他者削除）または退出（自分の削除）する。
   // 自分自身は常に退出可。他メンバーの削除は owner のみ可。
