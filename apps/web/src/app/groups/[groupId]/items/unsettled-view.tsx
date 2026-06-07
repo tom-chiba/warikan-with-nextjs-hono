@@ -92,10 +92,18 @@ export function UnsettledView({ groupId }: { groupId: string }) {
       return;
     }
     await run(async () => {
+      // 画面で確認した送金リスト（transfers）も送り、サーバー側の再計算と一致することを
+      // 確定前に検証してもらう（ADR-0013）。
       const res = await apiClient.groups[":groupId"].settlements.$post({
         param: { groupId },
-        json: { itemIds },
+        json: { itemIds, transfers },
       });
+      // 409 = 一覧が古い・送金リスト不一致。先に一覧を最新化してからサーバーの理由を表示する。
+      if (res.status === 409) {
+        const body = await res.json();
+        await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
+        throw new Error("error" in body ? body.error : "精算に失敗しました");
+      }
       if (!res.ok) {
         throw new Error("精算に失敗しました");
       }

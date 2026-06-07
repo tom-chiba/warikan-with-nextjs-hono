@@ -231,11 +231,18 @@ function deleteItem(cookie: string, groupId: string, itemId: string) {
   });
 }
 
-function settle(cookie: string, groupId: string, itemIds: string[]) {
+// transfers は画面で確認した送金リスト（ADR-0013 でサーバー側検証が入った）。
+// 単独メンバーのアイテムは収支が常に均衡するため、既定は空配列（送金不要）。
+function settle(
+  cookie: string,
+  groupId: string,
+  itemIds: string[],
+  transfers: { from: string; to: string; amount: number }[] = [],
+) {
   return SELF.fetch(`${BASE}/groups/${groupId}/settlements`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify({ itemIds }),
+    body: JSON.stringify({ itemIds, transfers }),
   });
 }
 
@@ -533,7 +540,71 @@ describe("POST /groups/:groupId/settlements（精算実行）", () => {
     expect(unsettled.items).toHaveLength(0);
   });
 
-  it("他グループ／既に精算済の id は巻き込まれない（settled に含まれない）", async () => {
+  it("複数人の割勘でも、画面で確認した送金リストと一致すれば精算できる", async () => {
+    const ownerCookie = await signUpAndGetCookie("settle-verify-owner@example.com");
+    const ownerId = await getUserId(env.DB, "settle-verify-owner@example.com");
+    await signUpAndGetCookie("settle-verify-friend@example.com");
+    const friendId = await getUserId(env.DB, "settle-verify-friend@example.com");
+    const groupId = await createGroup(ownerCookie);
+    await addMember(groupId, friendId);
+
+    // owner が 1000 立替、500 ずつ負担 → friend から owner へ 500 円。
+    const created = await postItem(ownerCookie, groupId, {
+      name: "ランチ",
+      payments: [{ userId: ownerId, amount: 1000 }],
+      shares: [
+        { userId: ownerId, amount: 500 },
+        { userId: friendId, amount: 500 },
+      ],
+    });
+    const itemId = ((await created.json()) as { id: string }).id;
+
+    const res = await settle(
+      ownerCookie,
+      groupId,
+      [itemId],
+      [{ from: friendId, to: ownerId, amount: 500 }],
+    );
+    expect(res.status).toBe(200);
+    const { settled } = (await res.json()) as { settled: string[] };
+    expect(settled).toEqual([itemId]);
+  });
+
+  it("送金リストがサーバー側の再計算と一致しなければ 409 で拒否され、何も更新されない", async () => {
+    const ownerCookie = await signUpAndGetCookie("settle-mismatch-owner@example.com");
+    const ownerId = await getUserId(env.DB, "settle-mismatch-owner@example.com");
+    await signUpAndGetCookie("settle-mismatch-friend@example.com");
+    const friendId = await getUserId(env.DB, "settle-mismatch-friend@example.com");
+    const groupId = await createGroup(ownerCookie);
+    await addMember(groupId, friendId);
+
+    const created = await postItem(ownerCookie, groupId, {
+      name: "ランチ",
+      payments: [{ userId: ownerId, amount: 1000 }],
+      shares: [
+        { userId: ownerId, amount: 500 },
+        { userId: friendId, amount: 500 },
+      ],
+    });
+    const itemId = ((await created.json()) as { id: string }).id;
+
+    // 金額が誤っている（500 円のはずが 300 円）→ 409。
+    const res = await settle(
+      ownerCookie,
+      groupId,
+      [itemId],
+      [{ from: friendId, to: ownerId, amount: 300 }],
+    );
+    expect(res.status).toBe(409);
+
+    // アイテムは未精算のまま残っている。
+    const unsettled = (await (await listItems(ownerCookie, groupId)).json()) as {
+      items: ListedItem[];
+    };
+    expect(unsettled.items.map((i) => i.id)).toEqual([itemId]);
+  });
+
+  it("存在しない・他グループ・精算済みの id が混じっていたら 409 で拒否され、何も更新されない", async () => {
     const cookie = await signUpAndGetCookie("settle-scope@example.com");
     const userId = await getUserId(env.DB, "settle-scope@example.com");
     const groupId = await createGroup(cookie);
@@ -544,9 +615,14 @@ describe("POST /groups/:groupId/settlements（精算実行）", () => {
     });
     const itemId = ((await created.json()) as { id: string }).id;
 
+    // 一覧が古い（混入 id がある）→ 部分的に精算せず全体を拒否する（ADR-0013）。
     const res = await settle(cookie, groupId, [itemId, "foreign-id"]);
-    const { settled } = (await res.json()) as { settled: string[] };
-    expect(settled).toEqual([itemId]);
+    expect(res.status).toBe(409);
+
+    const unsettled = (await (await listItems(cookie, groupId)).json()) as {
+      items: ListedItem[];
+    };
+    expect(unsettled.items.map((i) => i.id)).toEqual([itemId]);
   });
 
   it("当該グループのメンバーでなければ 403", async () => {
