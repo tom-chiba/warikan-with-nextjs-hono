@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { distributeEqually } from "@/lib/split";
+import { distributeEqually } from "@warikan/domain";
 
 // 購入品の入力フォーム（新規 #4 / 編集 #20 で共通利用）。
 // 支払額・割勘金額の入力、等分、「残りをここに」、合計・過不足表示、保存可否の判定を内包する。

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { apiClient } from "@/lib/api-client";
-import { computeSettlements } from "@/lib/settle";
+import { computeSettlements } from "@warikan/domain";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemsTable } from "./items-table";
 import { useItemActions } from "./use-item-actions";

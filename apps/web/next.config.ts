@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // @warikan/domain は TypeScript ソースをそのまま公開するワークスペースパッケージのため、
+  // Next.js 側でトランスパイルして取り込む（ADR-0013）。
+  transpilePackages: ["@warikan/domain"],
   async headers() {
     return [
       {
