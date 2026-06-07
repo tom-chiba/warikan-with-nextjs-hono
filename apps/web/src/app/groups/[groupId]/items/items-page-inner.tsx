@@ -44,12 +44,12 @@ export function ItemsPageInner() {
   // ナビは残存グループへの脱出経路として、先頭グループを選択した状態で表示する。
   if (!isMember) {
     return (
-      <main className="flex flex-1 flex-col items-center gap-8 p-8">
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-5 py-6">
         <MainNav groups={groups} selectedGroupId={groups[0]?.id ?? null} activeTab={status} />
-        <p className="text-sm text-zinc-500">
+        <p className="note-muted">
           このグループのアイテムは表示できません（脱退済みか、リンクが古い可能性があります）。
         </p>
-        <Link href="/" className="rounded-md border px-4 py-2">
+        <Link href="/" className="btn btn-line self-start">
           ホームへ
         </Link>
       </main>
@@ -57,11 +57,12 @@ export function ItemsPageInner() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-8 p-8">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-5 py-6">
       <MainNav groups={groups} selectedGroupId={groupId} activeTab={status} loading={!groupsData} />
-      <h1 className="text-2xl font-semibold">
-        {status === "settled" ? "精算済アイテム" : "未精算アイテム"}
-      </h1>
+      <div className="flex flex-col gap-1">
+        <span className="kicker">{status === "settled" ? "Settled" : "Unsettled"}</span>
+        <h1 className="headline">{status === "settled" ? "精算済アイテム" : "未精算アイテム"}</h1>
+      </div>
 
       {status === "settled" ? (
         <SettledView groupId={groupId} />

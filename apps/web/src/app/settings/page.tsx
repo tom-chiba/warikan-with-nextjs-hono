@@ -60,39 +60,36 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-8 p-8">
-      <h1 className="text-2xl font-semibold">設定</h1>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-6">
+      <div className="flex flex-col gap-1">
+        <span className="kicker">Settings</span>
+        <h1 className="headline">設定</h1>
+      </div>
 
-      <section className="flex w-full max-w-xs flex-col gap-3">
-        <h2 className="text-lg font-medium">グループ管理</h2>
-        <p className="text-sm text-zinc-500">
-          グループの作成・メンバーの招待や退出はこちらから行えます。
-        </p>
-        <Link href="/groups" className="rounded-md border px-4 py-2 text-center">
+      <section className="flex w-full flex-col gap-3">
+        <h2 className="section-title section-rule">グループ管理</h2>
+        <p className="note-muted">グループの作成・メンバーの招待や退出はこちらから行えます。</p>
+        <Link href="/groups" className="btn btn-line self-start">
           グループ管理へ
         </Link>
       </section>
 
-      <section className="flex w-full max-w-xs flex-col gap-2">
-        <h2 className="text-lg font-medium">アカウント情報</h2>
+      <section className="flex w-full flex-col gap-2">
+        <h2 className="section-title section-rule">アカウント情報</h2>
         <p className="text-sm">
-          名前: <span className="font-mono">{session.user.name}</span>
+          名前: <span className="font-bold">{session.user.name}</span>
         </p>
         <p className="text-sm">
-          メール: <span className="font-mono">{session.user.email}</span>
+          メール: <span className="font-mono text-xs">{session.user.email}</span>
         </p>
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="mt-1 self-start text-sm text-zinc-500 underline"
-        >
+        <button type="button" onClick={handleSignOut} className="link-quiet mt-1 self-start">
           サインアウト
         </button>
       </section>
 
-      <section className="flex w-full max-w-xs flex-col gap-3 rounded-lg border border-red-300 p-4 dark:border-red-900">
-        <h2 className="text-lg font-medium text-red-600 dark:text-red-400">危険な操作</h2>
-        <p className="text-sm text-zinc-500">
+      <section className="flex w-full flex-col gap-3 border-2 border-danger p-4">
+        <h2 className="section-title border-b-2 border-danger pb-1.5 text-danger">危険な操作</h2>
+        <p className="note-muted">
           アカウントを削除（退会）します。あなただけが参加しているグループは削除され、他のメンバーが残るグループでもあなたの支払・負担記録は削除されます。この操作は取り消せません。
         </p>
         <form onSubmit={handleDelete} className="flex flex-col gap-3">
@@ -103,20 +100,20 @@ export default function SettingsPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded-md border px-3 py-2"
+            className="field"
           />
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="note-danger">{error}</p>}
           <button
             type="submit"
             disabled={submitting || password.length === 0}
-            className="rounded-md bg-red-600 px-4 py-2 text-white disabled:opacity-50"
+            className="btn btn-fill-danger"
           >
             アカウントを削除
           </button>
         </form>
       </section>
 
-      <Link href="/" className="rounded-md border px-4 py-2">
+      <Link href="/" className="link-quiet self-start">
         ホームへ戻る
       </Link>
     </main>

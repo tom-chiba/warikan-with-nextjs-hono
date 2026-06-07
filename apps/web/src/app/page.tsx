@@ -32,8 +32,14 @@ export default function Home() {
   // SignInPrompt（@/components/session-states）が href="/" でここへ誘導するため、この導線は維持する。
   if (!session) {
     return (
-      <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-        <h1 className="text-2xl font-semibold">{APP_NAME}</h1>
+      <main className="flex flex-1 flex-col items-center justify-center gap-8 p-8">
+        <div className="flex flex-col items-center gap-2">
+          {/* ワードマーク。太字大文字 + 太罫線でマストヘッドの基準線をつくる。 */}
+          <h1 className="border-b-4 border-ink pb-1 text-4xl font-black uppercase tracking-[0.08em]">
+            {APP_NAME}
+          </h1>
+          <p className="kicker">Split the bill, sharp.</p>
+        </div>
         <AuthPanel />
       </main>
     );
@@ -47,24 +53,21 @@ export default function Home() {
   const currentGroup = resolveCurrentGroup(groups, groupsData?.currentGroupId);
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-6 p-8">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-5 py-6">
       <MainNav
         groups={groups}
         selectedGroupId={currentGroup?.id ?? null}
         activeTab="entry"
         loading={groupsLoading}
       />
-      {groupsLoading && <p className="text-zinc-500">グループを読み込み中…</p>}
-      {groupsError && <p className="text-sm text-red-500">グループ一覧の取得に失敗しました。</p>}
+      {groupsLoading && <p className="note-muted">グループを読み込み中…</p>}
+      {groupsError && <p className="note-danger">グループ一覧の取得に失敗しました。</p>}
       {groupsReady && groups.length === 0 && (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-sm text-zinc-500">
+        <div className="flex flex-col items-start gap-3">
+          <p className="note-muted">
             まだグループがありません。グループを作成して購入品の入力を始めましょう。
           </p>
-          <Link
-            href="/groups"
-            className="rounded-md bg-black px-4 py-2 text-white dark:bg-white dark:text-black"
-          >
+          <Link href="/groups" className="btn btn-fill">
             グループを作成
           </Link>
         </div>

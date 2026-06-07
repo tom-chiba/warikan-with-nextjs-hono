@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { distributeEqually } from "@warikan/domain";
+import { formatAmount } from "@/lib/format";
 
 // 購入品の入力フォーム（新規 #4 / 編集 #20 で共通利用）。
 // 支払額・割勘金額の入力、等分、「残りをここに」、合計・過不足表示、保存可否の判定を内包する。
@@ -162,7 +163,7 @@ export function ItemForm({
     <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-6">
       <section className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">購入品名</span>
+          <span className="text-sm font-bold">購入品名</span>
           <input
             type="text"
             required
@@ -172,11 +173,11 @@ export function ItemForm({
               setName(e.target.value);
             }}
             placeholder="例: ランチ"
-            className="rounded-md border px-3 py-2"
+            className="field"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">購入日（任意）</span>
+          <span className="text-sm font-bold">購入日（任意）</span>
           <input
             type="date"
             value={purchasedOn}
@@ -184,11 +185,11 @@ export function ItemForm({
               setSaved(false);
               setPurchasedOn(e.target.value);
             }}
-            className="rounded-md border px-3 py-2"
+            className="field"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">メモ（任意）</span>
+          <span className="text-sm font-bold">メモ（任意）</span>
           <textarea
             value={memo}
             onChange={(e) => {
@@ -196,19 +197,21 @@ export function ItemForm({
               setMemo(e.target.value);
             }}
             placeholder="補足があれば"
-            className="rounded-md border px-3 py-2"
+            className="field"
           />
         </label>
       </section>
 
       {members.length === 0 ? (
-        <p className="text-sm text-zinc-500">メンバーを読み込み中…</p>
+        <p className="note-muted">メンバーを読み込み中…</p>
       ) : (
         <>
           <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium">支払額</h2>
-              <span className="text-sm text-zinc-500">合計 {paymentTotal} 円</span>
+            <div className="section-rule flex items-baseline justify-between">
+              <h2 className="section-title">支払額</h2>
+              <span className="text-sm font-bold tabular-nums">
+                合計 {formatAmount(paymentTotal)} 円
+              </span>
             </div>
             <ul className="flex flex-col gap-2">
               {members.map((m) => (
@@ -222,7 +225,7 @@ export function ItemForm({
                     aria-label={`${m.name} の支払額`}
                     value={payments[m.userId] ?? ""}
                     onChange={(e) => handlePaymentChange(m.userId, e.target.value)}
-                    className="w-32 rounded-md border px-3 py-2 text-right"
+                    className="field w-32 text-right tabular-nums"
                   />
                 </li>
               ))}
@@ -230,13 +233,16 @@ export function ItemForm({
           </section>
 
           <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium">割勘金額</h2>
-              <span className="text-sm text-zinc-500">合計 {shareTotal} 円</span>
+            <div className="section-rule flex items-baseline justify-between">
+              <h2 className="section-title">割勘金額</h2>
+              <span className="text-sm font-bold tabular-nums">
+                合計 {formatAmount(shareTotal)} 円
+              </span>
             </div>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                className="accent-accent"
                 checked={equalSplit}
                 onChange={(e) => {
                   setSaved(false);
@@ -263,14 +269,14 @@ export function ItemForm({
                       aria-label={`${m.name} の割勘金額`}
                       value={shares[m.userId] ?? ""}
                       onChange={(e) => handleShareChange(m.userId, e.target.value)}
-                      className="w-32 rounded-md border px-3 py-2 text-right"
+                      className="field w-32 text-right tabular-nums"
                     />
                     <button
                       type="button"
                       // 不足（deficit > 0）のときだけ活性。一致・超過時は「残りを加算」の意味を持たないため無効。
                       disabled={deficit <= 0}
                       onClick={() => handleFillRemainder(m.userId)}
-                      className="rounded-md border px-2 py-1 text-xs disabled:opacity-40"
+                      className="btn btn-line btn-sm shrink-0"
                       title="不足分をこのメンバーに加算"
                     >
                       残りをここに
@@ -281,7 +287,7 @@ export function ItemForm({
             </ul>
             {/* 過不足の表示。0 なら一致。 */}
             {deficit !== 0 && (
-              <p className="text-sm text-amber-600">
+              <p className="text-sm font-medium tabular-nums text-warn">
                 支払額合計との差: {deficit > 0 ? `不足 ${deficit}` : `超過 ${-deficit}`} 円
               </p>
             )}
@@ -289,14 +295,10 @@ export function ItemForm({
         </>
       )}
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      {saved && successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
+      {error && <p className="note-danger">{error}</p>}
+      {saved && successMessage && <p className="note-ok">{successMessage}</p>}
 
-      <button
-        type="submit"
-        disabled={submitting || !canSubmit}
-        className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
-      >
+      <button type="submit" disabled={submitting || !canSubmit} className="btn btn-fill w-full">
         {submitLabel}
       </button>
     </form>

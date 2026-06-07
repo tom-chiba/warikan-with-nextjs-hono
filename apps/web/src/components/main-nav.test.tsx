@@ -97,9 +97,9 @@ test("精算済タブで切り替えると切替先グループの精算済一�
   expect(pushMock).toHaveBeenCalledWith("/groups/g2/items?status=settled");
 });
 
-test("アクティブタブが塗りつぶしで示される", () => {
+test("アクティブタブが下線で示される", () => {
   renderWithClient(<MainNav groups={oneGroup} selectedGroupId="g1" activeTab="unsettled" />);
 
-  expect(screen.getByRole("link", { name: "未精算" }).className).toContain("bg-black");
-  expect(screen.getByRole("link", { name: "入力" }).className).not.toContain("bg-black");
+  expect(screen.getByRole("link", { name: "未精算" }).className).toContain("border-ink");
+  expect(screen.getByRole("link", { name: "入力" }).className).not.toContain("border-ink");
 });

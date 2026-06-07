@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { formatAmount } from "@/lib/format";
 import { IndeterminateCheckbox } from "./indeterminate-checkbox";
 
 // 一覧テーブルの行に必要な最小限のアイテム情報。
@@ -28,6 +29,11 @@ type Props = {
   renderActions: (item: ItemRowData) => ReactNode;
 };
 
+// 見出し行は太罫線・小さめの強い字、本文行は細罫線で帳簿らしく組む（Issue #38）。
+// 見出し・日付・金額は折り返さず、モバイル幅では操作ボタン側が flex-wrap で逃げる。
+// 静的な文字列なのでモジュールレベルに置き、レンダーごとの再生成を避ける。
+const headClass = "whitespace-nowrap py-2 text-xs font-bold tracking-widest text-muted";
+
 // 未精算・精算済の両ビューで共有するアイテム一覧テーブル（Issue #23: 見た目の共通化）。
 export function ItemsTable({ items, selectable, renderActions }: Props) {
   // 一部選択（indeterminate 表示）の判定。selected に一覧外の id が残っていても
@@ -36,7 +42,7 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
-        <tr className="border-b text-left text-zinc-500">
+        <tr className="border-b-2 border-ink text-left">
           {selectable && (
             <th className="w-8 py-2">
               <IndeterminateCheckbox
@@ -47,30 +53,35 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
               />
             </th>
           )}
-          <th className="py-2">購入品名</th>
-          <th className="py-2">購入日</th>
-          <th className="py-2 text-right">合計金額</th>
-          <th className="py-2 text-right">操作</th>
+          <th className={`${headClass} pr-4`}>購入品名</th>
+          <th className={`${headClass} pr-4`}>購入日</th>
+          <th className={`${headClass} pr-4 text-right`}>合計金額</th>
+          <th className={`${headClass} text-right`}>操作</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => (
-          <tr key={item.id} className="border-b">
+          <tr key={item.id} className="border-b border-rule">
             {selectable && (
-              <td className="py-2">
+              <td className="py-2.5">
                 <input
                   type="checkbox"
+                  className="accent-accent"
                   aria-label={`${item.name} を選択`}
                   checked={selectable.selected.has(item.id)}
                   onChange={() => selectable.onToggle(item.id)}
                 />
               </td>
             )}
-            <td className="py-2">{item.name}</td>
-            <td className="py-2">{item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}</td>
-            <td className="py-2 text-right">{item.total} 円</td>
-            <td className="py-2 text-right">
-              <span className="flex justify-end gap-2">{renderActions(item)}</span>
+            <td className="py-2.5 pr-4 font-medium">{item.name}</td>
+            <td className="whitespace-nowrap py-2.5 pr-4 tabular-nums text-muted">
+              {item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}
+            </td>
+            <td className="whitespace-nowrap py-2.5 pr-4 text-right font-bold tabular-nums">
+              {formatAmount(item.total)} 円
+            </td>
+            <td className="py-2.5 text-right">
+              <span className="flex flex-wrap justify-end gap-1.5">{renderActions(item)}</span>
             </td>
           </tr>
         ))}

@@ -42,8 +42,11 @@ export default function NewItemPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-8 p-8">
-      <h1 className="text-2xl font-semibold">購入品を入力</h1>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-6">
+      <div className="flex flex-col gap-1">
+        <span className="kicker">New Item</span>
+        <h1 className="headline">購入品を入力</h1>
+      </div>
 
       <ItemForm
         members={members}
@@ -54,7 +57,7 @@ export default function NewItemPage() {
       />
 
       {/* 日常動線の戻り先は未精算一覧（グループ詳細は設定動線のページ、#51）。 */}
-      <Link href={`/groups/${groupId}/items`} className="rounded-md border px-4 py-2">
+      <Link href={`/groups/${groupId}/items`} className="link-quiet self-start">
         購入品一覧へ戻る
       </Link>
     </main>
