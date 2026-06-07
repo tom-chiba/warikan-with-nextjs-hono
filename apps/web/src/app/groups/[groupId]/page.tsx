@@ -8,6 +8,8 @@ import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { useGroupMembers } from "@/lib/use-group-members";
+import { useGroups } from "@/lib/use-groups";
+import { GroupNameEditor } from "./group-name-editor";
 import { MemberRow } from "./member-row";
 
 export default function GroupPage() {
@@ -38,6 +40,10 @@ export default function GroupPage() {
   // メンバー一覧を取得する。
   const { data: membersData } = useGroupMembers(groupId, !!session);
 
+  // 見出しに出すグループ名は ["groups"] キャッシュから引く（#65）。
+  // 他ページで取得済みならキャッシュヒットし追加往復は発生しない。
+  const { data: groupsData } = useGroups(!!session);
+
   if (isPending) {
     return <SessionPending />;
   }
@@ -55,6 +61,8 @@ export default function GroupPage() {
   const members = membersData?.members ?? [];
   const currentUserId = session.user.id;
   const isOwner = members.some((m) => m.userId === currentUserId && m.role === "owner");
+  // キャッシュ未着の間は null（見出しは固定テキスト「グループ」にフォールバック）。
+  const groupName = groupsData?.groups.find((g) => g.id === groupId)?.name ?? null;
 
   async function handleGenerate() {
     setError(null);
@@ -143,7 +151,11 @@ export default function GroupPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-6">
       <div className="flex flex-col gap-1">
         <span className="kicker">Group</span>
-        <h1 className="headline">グループ</h1>
+        {groupName !== null ? (
+          <GroupNameEditor groupId={groupId} groupName={groupName} isOwner={isOwner} />
+        ) : (
+          <h1 className="headline">グループ</h1>
+        )}
         <p className="note-muted">
           グループ ID: <span className="font-mono text-xs">{groupId}</span>
         </p>
