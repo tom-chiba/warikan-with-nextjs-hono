@@ -22,9 +22,10 @@ export function SessionCacheBoundary() {
     }
     // 「未ログイン → ログイン」では破棄ではなく無効化する。ルート / はセッション解決を待たず
     // groups を並列発火するため（use-groups.ts）、サインイン前の 401 エラー状態が残っている。
-    // invalidate でクッキー付きの再取得を促す（この時点で存在するクエリは実質 groups のみ）。
+    // invalidate でクッキー付きの再取得を促す。セッション解決前に発火するクエリは groups だけ
+    // なので、対象もそれに絞る（将来別の先行クエリを足す場合はここに追記する）。
     if (prevUserIdRef.current === null && userId !== null) {
-      queryClient.invalidateQueries();
+      queryClient.invalidateQueries({ queryKey: ["groups"] });
     }
     prevUserIdRef.current = userId;
   }, [userId, queryClient]);
