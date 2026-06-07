@@ -23,3 +23,7 @@ trustPolicyExclude:
   # tinyexec: vitest の推移依存。tinylibs 製の正規パッケージで 1.2.2 は provenance 証明あり。
   # 「trusted-publisher → provenance」を no-downgrade が降格扱いする誤検知のため除外。
   - tinyexec
+  # semver: @babel/core の推移依存。6.3.1 は npm CLI チームによる 6.x 系へのセキュリティ
+  # バックポート（CVE-2022-25883 修正、公開者 lukekarrys を確認済み）。provenance 付きの
+  # 7.5.x より後に公開されたため no-downgrade が降格扱いする誤検知のため除外。
+  - semver
