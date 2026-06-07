@@ -12,6 +12,7 @@ test("グループ作成→招待→別ユーザーが参加→メンバー一�
   const ownerCtx = await browser.newContext();
   const owner = await ownerCtx.newPage();
   await owner.goto("/");
+  await owner.getByRole("tab", { name: "サインアップ" }).click();
   await owner.getByLabel("名前").fill("Owner");
   await owner.getByLabel("メールアドレス").fill(ownerEmail);
   await owner.getByLabel("パスワード").fill("password1234");
@@ -38,6 +39,7 @@ test("グループ作成→招待→別ユーザーが参加→メンバー一�
   const invitee = await inviteeCtx.newPage();
   await invitee.goto(invitePath);
   // 未ログインなので認証パネルが出る。サインアップするとセッションが更新され参加確認に切り替わる。
+  await invitee.getByRole("tab", { name: "サインアップ" }).click();
   await invitee.getByLabel("名前").fill("Invitee");
   await invitee.getByLabel("メールアドレス").fill(inviteeEmail);
   await invitee.getByLabel("パスワード").fill("password1234");

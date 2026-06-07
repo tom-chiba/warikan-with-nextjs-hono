@@ -6,6 +6,7 @@ test("メールでサインアップするとログイン状態になり、サ�
 
   await page.goto("/");
 
+  await page.getByRole("tab", { name: "サインアップ" }).click();
   await page.getByLabel("名前").fill("E2E User");
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill("password1234");
@@ -21,5 +22,5 @@ test("メールでサインアップするとログイン状態になり、サ�
   await page.getByRole("link", { name: "設定" }).click();
   await expect(page.getByText(email)).toBeVisible();
   await page.getByRole("button", { name: "サインアウト" }).click();
-  await expect(page.getByRole("button", { name: "サインアップ" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "サインイン" })).toBeVisible();
 });

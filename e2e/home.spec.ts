@@ -7,11 +7,16 @@ test("未ログインでトップページを開くとサインイン/サイン�
 
   await expect(page.getByRole("heading", { name: "warikan" })).toBeVisible();
 
-  await expect(page.getByLabel("名前")).toBeVisible();
+  // 初期表示はサインイン。名前フィールドは出ない（#60）。
   await expect(page.getByLabel("メールアドレス")).toBeVisible();
   await expect(page.getByLabel("パスワード")).toBeVisible();
-  await expect(page.getByRole("button", { name: "サインアップ" })).toBeVisible();
   await expect(page.getByRole("button", { name: "サインイン" })).toBeVisible();
+  await expect(page.getByLabel("名前")).toBeHidden();
+
+  // サインアップタブへ切り替えると名前フィールドが出る。
+  await page.getByRole("tab", { name: "サインアップ" }).click();
+  await expect(page.getByLabel("名前")).toBeVisible();
+  await expect(page.getByRole("button", { name: "サインアップ" })).toBeVisible();
 });
 
 // #45: ログイン済みユーザーがアプリを開いたら、ワンタップも挟まず購入品入力に到達できる。
@@ -22,6 +27,7 @@ test("ログイン済みでグループが 1 件なら、トップページで�
   const email = `e2e-home-${Date.now()}@example.com`;
 
   await page.goto("/");
+  await page.getByRole("tab", { name: "サインアップ" }).click();
   await page.getByLabel("名前").fill("Home User");
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill("password1234");
