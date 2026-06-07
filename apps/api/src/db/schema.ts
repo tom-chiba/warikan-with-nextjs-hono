@@ -105,6 +105,9 @@ export const groupMember = sqliteTable(
     // メンバーシップ行に持たせることで、脱退時は行ごと消えて無効なカレント参照が残らない。
     // 秒精度だと素早いグループ切替で同値（タイ）になり順序が不定になるため、ミリ秒精度で持つ。
     lastViewedAt: integer("last_viewed_at", { mode: "timestamp_ms" }),
+    // このグループ内での表示名（#64）。null（未設定）なら user.name にフォールバックする。
+    // グループによって呼ばれたい名前が異なるため、user ではなくメンバーシップ行に持たせる。
+    displayName: text("display_name"),
   },
   (t) => [primaryKey({ columns: [t.groupId, t.userId] })],
 );
