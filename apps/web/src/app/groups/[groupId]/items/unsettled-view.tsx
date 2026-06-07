@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { computeSettlements } from "@warikan/domain";
 import { formatAmount } from "@/lib/format";
@@ -40,14 +40,14 @@ export function UnsettledView({ groupId }: { groupId: string }) {
   const items = itemsData?.items ?? [];
   const members = membersData?.members ?? [];
   // userId → 表示名の索引。送金リストの行ごとに members を線形探索しないよう一度だけ構築する。
-  const nameById = useMemo(() => new Map(members.map((m) => [m.userId, m.name])), [members]);
+  // 再計算の抑制（メモ化）は React Compiler に任せる。
+  const nameById = new Map(members.map((m) => [m.userId, m.name]));
   const nameOf = (userId: string) => nameById.get(userId) ?? userId;
 
   // 選択中かつ一覧に存在するアイテムだけを対象に送金リストを算出する
   //（削除・精算で一覧から消えた id を取り残さない）。
-  // busy / error などの再描画では再計算しないよう items / selected に依存させる。
-  const selectedItems = useMemo(() => items.filter((i) => selected.has(i.id)), [items, selected]);
-  const transfers = useMemo(() => computeSettlements(selectedItems), [selectedItems]);
+  const selectedItems = items.filter((i) => selected.has(i.id));
+  const transfers = computeSettlements(selectedItems);
 
   function toggle(itemId: string) {
     setSelected((prev) => {
@@ -67,6 +67,8 @@ export function UnsettledView({ groupId }: { groupId: string }) {
 
   function toggleAll() {
     // toggle と同じく関数型更新で常に最新の選択状態からトグル方向を決める。
+    // allSelected（表示用）ではなく prev から再計算するのは、クリックから
+    // コールバック実行までの間に他の更新が割り込んでも正しく判定するため。
     setSelected((prev) => {
       const all = items.length > 0 && items.every((i) => prev.has(i.id));
       return all ? new Set<string>() : new Set(items.map((i) => i.id));
