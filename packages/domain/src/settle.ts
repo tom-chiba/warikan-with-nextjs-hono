@@ -75,3 +75,15 @@ export function minimizeTransfers(balances: Record<string, number>): Transfer[] 
 export function computeSettlements(items: SettlementItem[]): Transfer[] {
   return minimizeTransfers(computeBalances(items));
 }
+
+// 2 つの送金リストの完全一致を判定する（精算確定時のサーバー側検証、ADR-0013）。
+// computeSettlements() は入力順序に依存せず決定的（同額時は userId 順で安定）なため、
+// 同じデータからは必ず同じ配列が得られ、順序込みの単純比較で検証できる。
+// この比較器はその順序保証に依存している。minimizeTransfers のソート・タイブレークを
+// 変更する場合は、本関数の比較戦略もあわせて見直すこと。
+export function transfersEqual(a: Transfer[], b: Transfer[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every((t, i) => t.from === b[i].from && t.to === b[i].to && t.amount === b[i].amount)
+  );
+}

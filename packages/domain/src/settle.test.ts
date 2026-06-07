@@ -5,6 +5,7 @@ import {
   minimizeTransfers,
   type SettlementItem,
   type Transfer,
+  transfersEqual,
 } from "./settle";
 
 const sumTransfers = (transfers: Transfer[]) => transfers.reduce((acc, t) => acc + t.amount, 0);
@@ -123,5 +124,46 @@ describe("computeSettlements", () => {
       { from: "b", to: "a", amount: 400 },
       { from: "c", to: "a", amount: 400 },
     ]);
+  });
+});
+
+describe("transfersEqual", () => {
+  const t = (from: string, to: string, amount: number): Transfer => ({ from, to, amount });
+
+  it("同一内容・同一順序なら true（空同士も true）", () => {
+    expect(transfersEqual([t("a", "b", 100)], [t("a", "b", 100)])).toBe(true);
+    expect(transfersEqual([], [])).toBe(true);
+  });
+
+  it("金額・宛先・長さのいずれかが違えば false", () => {
+    expect(transfersEqual([t("a", "b", 100)], [t("a", "b", 101)])).toBe(false);
+    expect(transfersEqual([t("a", "b", 100)], [t("a", "c", 100)])).toBe(false);
+    expect(transfersEqual([t("a", "b", 100)], [])).toBe(false);
+  });
+
+  it("順序が違えば false（computeSettlements の決定的順序を前提とした順序込み比較）", () => {
+    const x = [t("a", "c", 100), t("b", "c", 50)];
+    const y = [t("b", "c", 50), t("a", "c", 100)];
+    expect(transfersEqual(x, y)).toBe(false);
+  });
+
+  it("computeSettlements の出力同士は入力アイテム順が違っても一致する（順序保証への依存を固定）", () => {
+    const lunch: SettlementItem = {
+      payments: [{ userId: "a", amount: 1000 }],
+      shares: [
+        { userId: "a", amount: 500 },
+        { userId: "b", amount: 500 },
+      ],
+    };
+    const dinner: SettlementItem = {
+      payments: [{ userId: "b", amount: 600 }],
+      shares: [
+        { userId: "a", amount: 300 },
+        { userId: "b", amount: 300 },
+      ],
+    };
+    expect(
+      transfersEqual(computeSettlements([lunch, dinner]), computeSettlements([dinner, lunch])),
+    ).toBe(true);
   });
 });

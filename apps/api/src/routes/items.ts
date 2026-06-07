@@ -1,11 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
-import { computeSettlements } from "@warikan/domain";
+import { computeSettlements, transfersEqual } from "@warikan/domain";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { DbVariables, GroupMemberVariables } from "../context";
 import { groupMember, item, itemPayment, itemShare } from "../db/schema";
-import { groupByItem, makeRows, sumAmount, transfersEqual, validateAmounts } from "../lib/items";
+import { groupByItem, makeRows, sumAmount, validateAmounts } from "../lib/items";
 
 // メンバーごとの金額入力（支払額・割勘金額の各行）。amount は正の整数（円）。
 // 0 円（支払い／負担なし）の行はそもそも送らない仕様のため positive で弾く。
