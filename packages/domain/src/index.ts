@@ -9,4 +9,5 @@ export {
   minimizeTransfers,
   type SettlementItem,
   type Transfer,
+  transfersEqual,
 } from "./settle";

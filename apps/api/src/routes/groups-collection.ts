@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AuthVariables, DbVariables } from "../context";
 import { group, groupMember } from "../db/schema";
+import { buildGroupList } from "../lib/group-list";
 
 // /groups のコレクションレベル（:groupId を伴わない）ルート。
 // メンバーシップは不要だがログインは必須なため、index.ts 側で requireAuth() + provideDb() を適用する。
@@ -54,18 +55,5 @@ export const groupsCollection = new Hono<{
 
     // カレントグループ = 最後に開いたグループ（last_viewed_at が最大の行）。一度も記録がなければ null。
     // 一覧取得に同梱することで、カレント解決のための追加の往復を発生させない（#51）。
-    // 一覧の整形（lastViewedAt を外す）とカレント判定は 1 回の走査でまとめて行う。
-    const groups: Pick<(typeof rows)[number], "id" | "name" | "role">[] = [];
-    let currentGroupId: string | null = null;
-    let latest = 0;
-    for (const { id, name, role, lastViewedAt } of rows) {
-      groups.push({ id, name, role });
-      const viewedAt = lastViewedAt?.getTime() ?? 0;
-      if (viewedAt > latest) {
-        latest = viewedAt;
-        currentGroupId = id;
-      }
-    }
-
-    return c.json({ groups, currentGroupId });
+    return c.json(buildGroupList(rows));
   });

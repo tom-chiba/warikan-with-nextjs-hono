@@ -1,4 +1,9 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": [".claude/**"]
+  "ignorePatterns": [
+    ".claude/**",
+    // drizzle-kit が生成・管理するマイグレーション/スナップショット。手で整形すると
+    // 次回の generate（drizzle-kit 自身のスタイルで出力）との差分ノイズになるため除外する。
+    "apps/api/drizzle/**"
+  ]
 }
