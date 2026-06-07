@@ -97,3 +97,15 @@ pnpm --filter @warikan/api run deploy
 
 - `pnpm --filter @warikan/api build`（`wrangler deploy --dry-run`）でバンドル検証。
 - デプロイ後、web からサインアップ→ログインが通ること（CORS / trustedOrigins / クッキー）。
+
+## 注意: `packages/domain` の計算ロジックを変更するリリース
+
+精算確定時、api は web が提示した送金リストを `@warikan/domain` の `computeSettlements()` で
+再計算して**完全一致**を検証する（ADR-0013）。web（Vercel）と api（Cloudflare）は独立に
+デプロイされるため、送金リストの出力に影響する変更（送金回数最小化のアルゴリズム・
+同額時のタイブレーク順など）を含むリリースでは、**両者が異なるバージョンで動く時間帯に
+精算が 409 になり得る**（エラー文言は「一覧を最新に」だがリロードでは解消しない）。
+
+- アルゴリズム変更を含むリリースは api → web を**間を空けずに**デプロイする
+- 利用の少ない時間帯を選ぶ。スキュー中の精算失敗は一時的で、両者が揃えば解消する
+- 入出力が変わらないリファクタリングはこの限りではない
