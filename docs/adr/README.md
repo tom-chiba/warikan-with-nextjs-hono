@@ -26,3 +26,4 @@
 | 0010 | [ハンドラへの DB 注入とコレクションルートの認可](./0010-db-injection-and-collection-routes.md) | accepted |
 | 0011 | [アカウント削除（退会）と孤児グループの掃除](./0011-account-deletion.md)                       | accepted |
 | 0012 | [テスト専用パスワードハッシャーによる api テストの高速化](./0012-test-password-hasher.md)      | accepted |
+| 0013 | [精算ロジックの共有ドメインパッケージ化とサーバー側検証](./0013-shared-domain-package.md)      | accepted |

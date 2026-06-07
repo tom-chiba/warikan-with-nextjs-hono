@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { computeSettlements, type Transfer } from "@warikan/domain";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -20,6 +21,14 @@ const itemSchema = z.object({
   memo: z.string().max(500).nullish(),
   payments: z.array(amountEntry),
   shares: z.array(amountEntry),
+});
+
+// 精算実行時にクライアントが確認した送金リスト。共有ロジック computeSettlements() の出力と
+// 同じ形（from → to へ amount 円）。サーバー側の再計算と突き合わせて検証する（ADR-0013）。
+const transferEntry = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+  amount: z.number().int().positive(),
 });
 
 const sumAmount = (entries: { amount: number }[]) => entries.reduce((acc, e) => acc + e.amount, 0);
@@ -51,6 +60,16 @@ async function groupMemberIds(
     .from(groupMember)
     .where(eq(groupMember.groupId, groupId));
   return new Set(rows.map((m) => m.userId));
+}
+
+// クライアントが確認した送金リストとサーバー側の再計算結果の完全一致を判定する。
+// computeSettlements() は入力順序に依存せず決定的（同額時は userId 順で安定）なため、
+// 同じデータからは必ず同じ配列が得られ、順序込みの単純比較で検証できる（ADR-0013）。
+function transfersEqual(a: Transfer[], b: Transfer[]) {
+  return (
+    a.length === b.length &&
+    a.every((t, i) => t.from === b[i].from && t.to === b[i].to && t.amount === b[i].amount)
+  );
 }
 
 // itemId をキーに金額行をまとめる（一覧で item ごとの payments/shares を組み立てる用）。
@@ -274,16 +293,74 @@ export const items = new Hono<{
     return c.json({ deleted: true });
   })
   // 精算を実行する（Issue #22）。選択された未精算アイテムを settled に一括更新する。
-  // groupId 一致かつ status = "unsettled" の id だけを対象にし、他グループや精算済の巻き込みを防ぐ。
-  // 実際に更新できた id を返す（存在しない / 既に精算済の id は黙って無視される）。
+  // クライアントが画面で確認した送金リスト（transfers）を受け取り、DB 上の payments / shares から
+  // 共有ロジックで再計算した結果と完全一致しなければ 409 で拒否する（ADR-0013）。
+  // 一覧が古い（選択アイテムが削除・精算済み）場合も同様に 409 で拒否し、
+  // 「表示された送金リスト = サーバー上のデータから導かれる送金リスト」を確定前に保証する。
   .post(
     "/:groupId/settlements",
-    zValidator("json", z.object({ itemIds: z.array(z.string().min(1)).min(1) })),
+    zValidator(
+      "json",
+      z.object({
+        itemIds: z.array(z.string().min(1)).min(1),
+        // 選択分の収支が均衡していれば空配列（送金不要）もあり得る。
+        transfers: z.array(transferEntry),
+      }),
+    ),
     async (c) => {
       const member = c.get("groupMember");
       const db = c.get("db");
-      const { itemIds } = c.req.valid("json");
+      const { itemIds, transfers } = c.req.valid("json");
 
+      // 対象アイテムを取得する（groupId 一致・未精算のみ）。選択された id と一致しなければ
+      // クライアントの一覧が古い（削除・精算済み・他グループ混入）ので拒否する。
+      const rows = await db
+        .select({ id: item.id })
+        .from(item)
+        .where(
+          and(
+            eq(item.groupId, member.groupId),
+            eq(item.status, "unsettled"),
+            inArray(item.id, itemIds),
+          ),
+        );
+      const foundIds = rows.map((r) => r.id);
+      if (foundIds.length !== new Set(itemIds).size) {
+        return c.json(
+          {
+            error:
+              "精算できないアイテムが含まれています。一覧を最新の状態にしてからやり直してください",
+          },
+          409,
+        );
+      }
+
+      // 対象アイテムの payments / shares から送金リストを再計算し、提示済みのものと突き合わせる。
+      const payments = await db
+        .select()
+        .from(itemPayment)
+        .where(inArray(itemPayment.itemId, foundIds));
+      const shares = await db.select().from(itemShare).where(inArray(itemShare.itemId, foundIds));
+      const paymentsByItem = groupByItem(payments);
+      const sharesByItem = groupByItem(shares);
+      const expected = computeSettlements(
+        foundIds.map((id) => ({
+          payments: paymentsByItem.get(id) ?? [],
+          shares: sharesByItem.get(id) ?? [],
+        })),
+      );
+      if (!transfersEqual(expected, transfers)) {
+        return c.json(
+          {
+            error:
+              "送金リストが最新のデータと一致しません。一覧を最新の状態にしてからやり直してください",
+          },
+          409,
+        );
+      }
+
+      // D1 は対話的トランザクション非対応のため、検証（SELECT）と更新（UPDATE）の間に他リクエストが
+      // 割り込む余地は残る。WHERE の groupId / status 条件を多重防御として維持し許容する（ADR-0013）。
       const settled = await db
         .update(item)
         .set({ status: "settled", updatedAt: new Date() })

@@ -154,7 +154,7 @@ test("選択すると送金リスト（誰 → 誰 / 金額）が表示される
   expect(within(list.closest("li") as HTMLElement).getByText("500 円")).toBeInTheDocument();
 });
 
-test("精算するとボタンで選択 id が settlements に送られる", async () => {
+test("精算するとボタンで選択 id と確認済み送金リストが settlements に送られる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
   settleMock.mockResolvedValue({ ok: true, json: async () => ({ settled: ["i1"] }) });
@@ -167,9 +167,29 @@ test("精算するとボタンで選択 id が settlements に送られる", asy
   await waitFor(() => {
     expect(settleMock).toHaveBeenCalledWith({
       param: { groupId: "g1" },
-      json: { itemIds: ["i1"] },
+      // 画面で確認した送金リストも送り、サーバー側で再計算と突き合わせる（ADR-0013）。
+      json: { itemIds: ["i1"], transfers: [{ from: "friend", to: "owner", amount: 500 }] },
     });
   });
+});
+
+test("精算が 409（一覧が古い・送金リスト不一致）ならサーバーの理由を表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+  settleMock.mockResolvedValue({
+    ok: false,
+    status: 409,
+    json: async () => ({
+      error: "送金リストが最新のデータと一致しません。一覧を最新の状態にしてからやり直してください",
+    }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
+
+  expect(await screen.findByText(/送金リストが最新のデータと一致しません/)).toBeInTheDocument();
 });
 
 test("精算が 0 件更新だったら警告を表示する", async () => {
