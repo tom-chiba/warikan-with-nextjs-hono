@@ -151,11 +151,7 @@ export default function GroupPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-6">
       <div className="flex flex-col gap-1">
         <span className="kicker">Group</span>
-        {groupName !== null ? (
-          <GroupNameEditor groupId={groupId} groupName={groupName} isOwner={isOwner} />
-        ) : (
-          <h1 className="headline">グループ</h1>
-        )}
+        <GroupNameEditor groupId={groupId} groupName={groupName} isOwner={isOwner} />
         <p className="note-muted">
           グループ ID: <span className="font-mono text-xs">{groupId}</span>
         </p>

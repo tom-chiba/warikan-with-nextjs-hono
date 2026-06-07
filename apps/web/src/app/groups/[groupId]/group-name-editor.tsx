@@ -14,7 +14,9 @@ export function GroupNameEditor({
   isOwner,
 }: {
   groupId: string;
-  groupName: string;
+  // ["groups"] キャッシュ未着の間は null（見出しは固定テキストにフォールバックし、
+  // 変更ボタンは現在名をプレフィルできないため無効化して出しておく）。
+  groupName: string | null;
   isOwner: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -25,7 +27,8 @@ export function GroupNameEditor({
 
   function startEditing() {
     // 開くたびに現在のグループ名から編集を始める（前回の編集途中の値やエラーを持ち越さない）。
-    setInput(groupName);
+    // groupName が null の間はボタンを無効化しているため、ここでは必ず取得済み。
+    setInput(groupName ?? "");
     setEditError(null);
     setEditing(true);
   }
@@ -90,9 +93,14 @@ export function GroupNameEditor({
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <h1 className="headline">{groupName}</h1>
+      <h1 className="headline">{groupName ?? "グループ"}</h1>
       {isOwner && (
-        <button type="button" onClick={startEditing} className="btn btn-line btn-sm">
+        <button
+          type="button"
+          disabled={groupName === null}
+          onClick={startEditing}
+          className="btn btn-line btn-sm"
+        >
           変更
         </button>
       )}
