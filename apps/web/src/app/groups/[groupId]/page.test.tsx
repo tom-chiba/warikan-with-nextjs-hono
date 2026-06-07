@@ -478,6 +478,9 @@ test("グループ名は現在名がプレフィルされ、保存で PATCH が�
 
   await userEvent.click(await screen.findByRole("button", { name: "変更" }));
 
+  // 編集中も h1 見出しは残る（ページの見出し構造を維持する）。
+  expect(screen.getByRole("heading", { name: "京都旅行" })).toBeInTheDocument();
+
   const input = screen.getByRole("textbox", { name: "グループ名" });
   expect(input).toHaveValue("京都旅行");
 

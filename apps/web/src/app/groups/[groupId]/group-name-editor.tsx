@@ -56,53 +56,54 @@ export function GroupNameEditor({
     }
   }
 
-  if (editing) {
-    return (
-      <form onSubmit={handleSave} className="flex flex-col gap-2">
-        <input
-          type="text"
-          aria-label="グループ名"
-          maxLength={100}
-          // ボタン押下で開く編集フォームなので、開いた直後に入力へフォーカスを移す。
-          autoFocus
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className="field"
-        />
-        {editError && <p className="note-danger">{editError}</p>}
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={saving || input.trim().length === 0}
-            className="btn btn-fill btn-sm"
-          >
-            保存
-          </button>
+  // 見出し（h1）は編集中もページから消さない（スクリーンリーダーの見出しナビゲーションと
+  // 文書構造を保つ）。member-row と同様、編集フォームは見出しの下に展開する。
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="headline">{groupName ?? "グループ"}</h1>
+        {isOwner && !editing && (
           <button
             type="button"
-            disabled={saving}
-            onClick={() => setEditing(false)}
+            disabled={groupName === null}
+            onClick={startEditing}
             className="btn btn-line btn-sm"
           >
-            キャンセル
+            変更
           </button>
-        </div>
-      </form>
-    );
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <h1 className="headline">{groupName ?? "グループ"}</h1>
-      {isOwner && (
-        <button
-          type="button"
-          disabled={groupName === null}
-          onClick={startEditing}
-          className="btn btn-line btn-sm"
-        >
-          変更
-        </button>
+        )}
+      </div>
+      {editing && (
+        <form onSubmit={handleSave} className="flex flex-col gap-2">
+          <input
+            type="text"
+            aria-label="グループ名"
+            maxLength={100}
+            // ボタン押下で開く編集フォームなので、開いた直後に入力へフォーカスを移す。
+            autoFocus
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className="field"
+          />
+          {editError && <p className="note-danger">{editError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={saving || input.trim().length === 0}
+              className="btn btn-fill btn-sm"
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setEditing(false)}
+              className="btn btn-line btn-sm"
+            >
+              キャンセル
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );
