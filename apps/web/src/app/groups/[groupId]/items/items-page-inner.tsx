@@ -30,15 +30,21 @@ export function ItemsPageInner() {
   // このグループを「最後に開いた」として記録する。直接 URL で開いた場合でも、
   // 次回 / を開いたときにこのグループのクイック入力が出るようカレントを同期する（#51）。
   // 一覧取得が済んでから比較し、すでにカレントなら何もしない（無駄な PUT を打たない）。
+  // currentGroupId は依存に入れず effect 内でキャッシュから読む。依存に入れると、
+  // セレクタでの切替（キャッシュ更新 → 遷移）の際に旧グループのページでこの effect が
+  // unmount 前に再実行され、旧グループを記録し直してしまう（切替が同一秒のタイで負ける）。
   const loggedIn = !!session;
-  const currentGroupId = groupsData?.currentGroupId;
   const groupsLoaded = !!groupsData;
   useEffect(() => {
-    if (!loggedIn || !groupsLoaded || currentGroupId === groupId) {
+    if (!loggedIn || !groupsLoaded) {
+      return;
+    }
+    const cached = queryClient.getQueryData<{ currentGroupId: string | null }>(["groups"]);
+    if (!cached || cached.currentGroupId === groupId) {
       return;
     }
     setCurrentGroup(queryClient, groupId);
-  }, [loggedIn, groupsLoaded, currentGroupId, groupId, queryClient]);
+  }, [loggedIn, groupsLoaded, groupId, queryClient]);
 
   if (isPending) {
     return <SessionPending />;
