@@ -34,7 +34,8 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
   // 影響を受けないよう、表示中の items を基準に導出する。
   const someSelected = !!selectable && items.some((i) => selectable.selected.has(i.id));
   // 見出し行は太罫線・小さめの強い字、本文行は細罫線で帳簿らしく組む（Issue #38）。
-  const headClass = "py-2 text-xs font-bold tracking-widest text-muted";
+  // 見出し・日付・金額は折り返さず、モバイル幅では操作ボタン側が flex-wrap で逃げる。
+  const headClass = "whitespace-nowrap py-2 text-xs font-bold tracking-widest text-muted";
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
@@ -49,9 +50,9 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
               />
             </th>
           )}
-          <th className={headClass}>購入品名</th>
-          <th className={headClass}>購入日</th>
-          <th className={`${headClass} text-right`}>合計金額</th>
+          <th className={`${headClass} pr-4`}>購入品名</th>
+          <th className={`${headClass} pr-4`}>購入日</th>
+          <th className={`${headClass} pr-4 text-right`}>合計金額</th>
           <th className={`${headClass} text-right`}>操作</th>
         </tr>
       </thead>
@@ -69,15 +70,15 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
                 />
               </td>
             )}
-            <td className="py-2.5 font-medium">{item.name}</td>
-            <td className="py-2.5 tabular-nums text-muted">
+            <td className="py-2.5 pr-4 font-medium">{item.name}</td>
+            <td className="whitespace-nowrap py-2.5 pr-4 tabular-nums text-muted">
               {item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}
             </td>
-            <td className="py-2.5 text-right font-bold tabular-nums">
+            <td className="whitespace-nowrap py-2.5 pr-4 text-right font-bold tabular-nums">
               {item.total.toLocaleString()} 円
             </td>
             <td className="py-2.5 text-right">
-              <span className="flex justify-end gap-2">{renderActions(item)}</span>
+              <span className="flex flex-wrap justify-end gap-1.5">{renderActions(item)}</span>
             </td>
           </tr>
         ))}
