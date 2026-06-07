@@ -8,6 +8,8 @@ import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { useGroupMembers } from "@/lib/use-group-members";
+import { useGroups } from "@/lib/use-groups";
+import { GroupNameEditor } from "./group-name-editor";
 import { MemberRow } from "./member-row";
 
 export default function GroupPage() {
@@ -38,6 +40,10 @@ export default function GroupPage() {
   // メンバー一覧を取得する。
   const { data: membersData } = useGroupMembers(groupId, !!session);
 
+  // 見出しに出すグループ名は ["groups"] キャッシュから引く（#65）。
+  // 他ページで取得済みならキャッシュヒットし追加往復は発生しない。
+  const { data: groupsData } = useGroups(!!session);
+
   if (isPending) {
     return <SessionPending />;
   }
@@ -55,6 +61,8 @@ export default function GroupPage() {
   const members = membersData?.members ?? [];
   const currentUserId = session.user.id;
   const isOwner = members.some((m) => m.userId === currentUserId && m.role === "owner");
+  // キャッシュ未着の間は null（見出しは固定テキスト「グループ」にフォールバック）。
+  const groupName = groupsData?.groups.find((g) => g.id === groupId)?.name ?? null;
 
   async function handleGenerate() {
     setError(null);
@@ -125,8 +133,9 @@ export default function GroupPage() {
       }
       if (isSelf) {
         // 退出したらこのグループの画面には留まれないため一覧へ戻る。
-        // この画面では ["groups"] のオブザーバが居ない（非アクティブ）ため、refetchType: "all" で
-        // その場で再取得まで済ませる。ルート（/）が退出済みグループのクイック入力を出すのを防ぐ。
+        // 直後の遷移でこの画面の ["groups"] オブザーバ（見出しの useGroups、#65）が消えるため、
+        // オブザーバの状態に依存しない refetchType: "all" でその場で再取得まで済ませる。
+        // ルート（/）が退出済みグループのクイック入力を出すのを防ぐ。
         await queryClient.invalidateQueries({ queryKey: ["groups"], refetchType: "all" });
         router.push("/groups");
         return;
@@ -143,7 +152,7 @@ export default function GroupPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-6">
       <div className="flex flex-col gap-1">
         <span className="kicker">Group</span>
-        <h1 className="headline">グループ</h1>
+        <GroupNameEditor groupId={groupId} groupName={groupName} isOwner={isOwner} />
         <p className="note-muted">
           グループ ID: <span className="font-mono text-xs">{groupId}</span>
         </p>
