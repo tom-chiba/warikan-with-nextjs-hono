@@ -31,6 +31,25 @@ describe("認証 (Better Auth + D1)", () => {
     expect(row?.email).toBe("test@example.com");
   });
 
+  // クライアントの required は空白のみを通すため、サーバー側の before フックで弾く（#60）。
+  it("空白のみの名前でのサインアップは 400 を返す", async () => {
+    const res = await SELF.fetch(`${BASE}/api/auth/sign-up/email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "   ",
+        email: "blank-name@example.com",
+        password: "password1234",
+      }),
+    });
+    expect(res.status).toBe(400);
+
+    const row = await env.DB.prepare("SELECT email FROM user WHERE email = ?")
+      .bind("blank-name@example.com")
+      .first<{ email: string }>();
+    expect(row).toBeNull();
+  });
+
   it("誤ったパスワードのサインインは 401 を返す", async () => {
     await SELF.fetch(`${BASE}/api/auth/sign-up/email`, {
       method: "POST",
