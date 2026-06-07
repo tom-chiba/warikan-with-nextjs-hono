@@ -39,6 +39,15 @@ export function createAuth(env: Env) {
         if (ctx.path === "/delete-user" && !ctx.body?.password) {
           throw new APIError("BAD_REQUEST", { message: "パスワードを入力してください" });
         }
+        // Better Auth の既定では name は存在チェックのみで、空文字・空白のみでも通る。
+        // user.name は notNull かつメンバー一覧等にそのまま表示されるため（#60）、
+        // クライアントの required だけに頼らずサーバー側でも空でないことを強制する。
+        if (ctx.path === "/sign-up/email") {
+          const name = typeof ctx.body?.name === "string" ? ctx.body.name.trim() : "";
+          if (!name) {
+            throw new APIError("BAD_REQUEST", { message: "名前を入力してください" });
+          }
+        }
       }),
     },
     user: {
