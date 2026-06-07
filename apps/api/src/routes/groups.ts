@@ -1,5 +1,7 @@
+import { zValidator } from "@hono/zod-validator";
 import { and, desc, eq, gt, isNull, notExists } from "drizzle-orm";
 import { Hono } from "hono";
+import { z } from "zod";
 import type { DbVariables, GroupMemberVariables } from "../context";
 import { group, groupInvitation, groupMember } from "../db/schema";
 import { selectGroupMembers } from "../lib/group-members";
@@ -36,6 +38,28 @@ export const groups = new Hono<{
 
     return c.json({ members: await selectGroupMembers(db, member.groupId) });
   })
+  // 自分のグループ内表示名を設定・変更する（#64）。
+  // 変更できるのは自分のメンバーシップ行だけなので、パスは :userId ではなく me で表現する
+  //（リテラルセグメントをパラメータルート :userId より先にチェーンし、"me" が :userId に
+  //  マッチしないようにする）。requireGroupMember 済みの userId で UPDATE するため、
+  //  本人チェックのコードは不要で「自分のみ変更可」が構造的に保証される。
+  // 空・空白のみは trim 後の min(1) で弾く。クリア（null に戻す）操作は提供しない。
+  .put(
+    "/:groupId/members/me/display-name",
+    zValidator("json", z.object({ displayName: z.string().trim().min(1).max(100) })),
+    async (c) => {
+      const member = c.get("groupMember");
+      const db = c.get("db");
+      const { displayName } = c.req.valid("json");
+
+      await db
+        .update(groupMember)
+        .set({ displayName })
+        .where(and(eq(groupMember.groupId, member.groupId), eq(groupMember.userId, member.userId)));
+
+      return c.json({ ok: true });
+    },
+  )
   // メンバーを削除（他者削除）または退出（自分の削除）する。
   // 自分自身は常に退出可。他メンバーの削除は owner のみ可。
   // 最後の 1 人が抜けた場合はグループ自体も削除する（関連データは CASCADE で消える）。

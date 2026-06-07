@@ -10,6 +10,7 @@ const {
   deleteMock,
   membersGetMock,
   memberDeleteMock,
+  displayNamePutMock,
   pushMock,
   clipboardMock,
   confirmMock,
@@ -20,6 +21,7 @@ const {
   deleteMock: vi.fn(),
   membersGetMock: vi.fn(),
   memberDeleteMock: vi.fn(),
+  displayNamePutMock: vi.fn(),
   pushMock: vi.fn(),
   clipboardMock: vi.fn(),
   confirmMock: vi.fn(),
@@ -46,6 +48,7 @@ vi.mock("@/lib/api-client", () => ({
         members: {
           $get: (...args: unknown[]) => membersGetMock(...args),
           ":userId": { $delete: (...args: unknown[]) => memberDeleteMock(...args) },
+          me: { "display-name": { $put: (...args: unknown[]) => displayNamePutMock(...args) } },
         },
       },
     },
@@ -70,7 +73,10 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const loggedIn = { data: { user: { id: "u1", email: "me@example.com" } }, isPending: false };
+const loggedIn = {
+  data: { user: { id: "u1", name: "わたし", email: "me@example.com" } },
+  isPending: false,
+};
 const futureIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 const nowIso = new Date().toISOString();
 
@@ -81,7 +87,14 @@ function setDefaults() {
     ok: true,
     json: async () => ({
       members: [
-        { userId: "u1", name: "わたし", email: "me@example.com", role: "owner", joinedAt: nowIso },
+        {
+          userId: "u1",
+          name: "わたし",
+          displayName: null,
+          email: "me@example.com",
+          role: "owner",
+          joinedAt: nowIso,
+        },
       ],
     }),
   });
@@ -145,10 +158,18 @@ test("owner は他メンバーを削除でき、自分には退出ボタンが�
     ok: true,
     json: async () => ({
       members: [
-        { userId: "u1", name: "わたし", email: "me@example.com", role: "owner", joinedAt: nowIso },
+        {
+          userId: "u1",
+          name: "わたし",
+          displayName: null,
+          email: "me@example.com",
+          role: "owner",
+          joinedAt: nowIso,
+        },
         {
           userId: "u2",
           name: "ともだち",
+          displayName: null,
           email: "f@example.com",
           role: "member",
           joinedAt: nowIso,
@@ -210,10 +231,18 @@ test("メンバー削除に失敗するとエラーメッセージを表示す�
     ok: true,
     json: async () => ({
       members: [
-        { userId: "u1", name: "わたし", email: "me@example.com", role: "owner", joinedAt: nowIso },
+        {
+          userId: "u1",
+          name: "わたし",
+          displayName: null,
+          email: "me@example.com",
+          role: "owner",
+          joinedAt: nowIso,
+        },
         {
           userId: "u2",
           name: "ともだち",
+          displayName: null,
           email: "f@example.com",
           role: "member",
           joinedAt: nowIso,
@@ -228,4 +257,148 @@ test("メンバー削除に失敗するとエラーメッセージを表示す�
   await userEvent.click(await screen.findByRole("button", { name: "削除" }));
 
   expect(await screen.findByText("メンバーの削除に失敗しました")).toBeInTheDocument();
+});
+
+test("「表示名を変更」ボタンは自分の行にだけ表示される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  activeGetMock.mockResolvedValue({ ok: true, json: async () => ({ invitation: null }) });
+  membersGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      members: [
+        {
+          userId: "u1",
+          name: "わたし",
+          displayName: null,
+          email: "me@example.com",
+          role: "owner",
+          joinedAt: nowIso,
+        },
+        {
+          userId: "u2",
+          name: "ともだち",
+          displayName: null,
+          email: "f@example.com",
+          role: "member",
+          joinedAt: nowIso,
+        },
+      ],
+    }),
+  });
+
+  renderWithClient(<GroupPage />);
+
+  expect(await screen.findByText("ともだち")).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "表示名を変更" })).toHaveLength(1);
+});
+
+test("未設定なら入力欄は空でアカウント名がプレースホルダになり、保存で PUT が呼ばれ一覧を再取得する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setDefaults();
+  displayNamePutMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "表示名を変更" }));
+
+  const input = screen.getByRole("textbox", { name: "表示名" });
+  expect(input).toHaveValue("");
+  expect(input).toHaveAttribute("placeholder", "わたし");
+
+  await userEvent.type(input, "お父さん");
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  await waitFor(() => {
+    expect(displayNamePutMock).toHaveBeenCalledWith({
+      param: { groupId: "g1" },
+      json: { displayName: "お父さん" },
+    });
+    // invalidate により一覧を再取得する（初回 + 保存後）。
+    expect(membersGetMock).toHaveBeenCalledTimes(2);
+  });
+  // 保存に成功したら編集フォームは閉じる。
+  expect(screen.queryByRole("textbox", { name: "表示名" })).not.toBeInTheDocument();
+});
+
+test("設定済みの表示名は入力欄にプレフィルされ、前後の空白は取り除いて送信する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  activeGetMock.mockResolvedValue({ ok: true, json: async () => ({ invitation: null }) });
+  membersGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      members: [
+        {
+          userId: "u1",
+          name: "お父さん",
+          displayName: "お父さん",
+          email: "me@example.com",
+          role: "owner",
+          joinedAt: nowIso,
+        },
+      ],
+    }),
+  });
+  displayNamePutMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "表示名を変更" }));
+
+  const input = screen.getByRole("textbox", { name: "表示名" });
+  expect(input).toHaveValue("お父さん");
+
+  await userEvent.clear(input);
+  await userEvent.type(input, "  パパ  ");
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  await waitFor(() => {
+    expect(displayNamePutMock).toHaveBeenCalledWith({
+      param: { groupId: "g1" },
+      json: { displayName: "パパ" },
+    });
+  });
+});
+
+test("空白のみの入力では保存ボタンが無効で API は呼ばれない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setDefaults();
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "表示名を変更" }));
+
+  const input = screen.getByRole("textbox", { name: "表示名" });
+  expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+
+  await userEvent.type(input, "   ");
+  expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
+  expect(displayNamePutMock).not.toHaveBeenCalled();
+});
+
+test("キャンセルで編集フォームが閉じ、API は呼ばれない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setDefaults();
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "表示名を変更" }));
+  await userEvent.click(screen.getByRole("button", { name: "キャンセル" }));
+
+  expect(screen.queryByRole("textbox", { name: "表示名" })).not.toBeInTheDocument();
+  expect(displayNamePutMock).not.toHaveBeenCalled();
+});
+
+test("表示名の保存に失敗するとエラーメッセージを表示し、フォームは開いたまま残る", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setDefaults();
+  displayNamePutMock.mockResolvedValue({ ok: false, json: async () => ({}) });
+
+  renderWithClient(<GroupPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "表示名を変更" }));
+  await userEvent.type(screen.getByRole("textbox", { name: "表示名" }), "お父さん");
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  expect(await screen.findByText("表示名の保存に失敗しました")).toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "表示名" })).toBeInTheDocument();
 });

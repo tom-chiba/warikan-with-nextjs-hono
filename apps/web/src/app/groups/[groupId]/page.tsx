@@ -8,6 +8,7 @@ import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
 import { useGroupMembers } from "@/lib/use-group-members";
+import { MemberRow } from "./member-row";
 
 export default function GroupPage() {
   const params = useParams<{ groupId: string }>();
@@ -203,37 +204,17 @@ export default function GroupPage() {
           <ul className="flex flex-col">
             {members.map((m) => {
               const isSelf = m.userId === currentUserId;
-              const canRemove = isSelf || isOwner;
               return (
-                <li
+                <MemberRow
                   key={m.userId}
-                  className="flex items-center justify-between border-b border-rule px-1 py-3"
-                >
-                  <span className="flex flex-col">
-                    <span className="font-bold">
-                      {m.name}
-                      {isSelf && (
-                        <span className="ml-1 text-xs font-medium text-muted">（あなた）</span>
-                      )}
-                    </span>
-                    <span className="text-xs text-muted">{m.email}</span>
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <span className="text-xs font-bold tracking-widest text-muted">
-                      {m.role === "owner" ? "オーナー" : "メンバー"}
-                    </span>
-                    {canRemove && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => handleRemove(m.userId, isSelf, m.name)}
-                        className="btn btn-line-danger btn-sm"
-                      >
-                        {isSelf ? "退出" : "削除"}
-                      </button>
-                    )}
-                  </span>
-                </li>
+                  groupId={groupId}
+                  member={m}
+                  isSelf={isSelf}
+                  canRemove={isSelf || isOwner}
+                  accountName={session.user.name}
+                  busy={busy}
+                  onRemove={() => handleRemove(m.userId, isSelf, m.name)}
+                />
               );
             })}
           </ul>
