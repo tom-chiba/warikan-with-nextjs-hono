@@ -146,8 +146,8 @@ describe("GET /groups（所属グループ一覧）", () => {
     });
     expect(putRes.status).toBe(200);
     await SELF.fetch(`${BASE}/groups/${g2}/last-viewed`, { method: "PUT", headers: { cookie } });
-    // last_viewed_at は秒精度で同一秒のタイになりうるため、g2 を明示的に未来へずらして
-    // 「後から開いた方が勝つ」状態を決定的に作る。
+    // ミリ秒精度でもテスト実行が同一ミリ秒に収まる可能性はゼロではないため、
+    // g2 を明示的に未来へずらして「後から開いた方が勝つ」状態を決定的に作る。
     await env.DB.prepare(
       "UPDATE group_member SET last_viewed_at = last_viewed_at + 10 WHERE group_id = ?",
     )

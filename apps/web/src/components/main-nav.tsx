@@ -21,8 +21,6 @@ export function MainNav({ groups, selectedGroupId, activeTab }: Props) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const selected = groups.find((g) => g.id === selectedGroupId) ?? null;
-
   function handleGroupChange(nextId: string) {
     setCurrentGroup(queryClient, nextId);
     // 一覧系タブを開いているときは、切替先グループの同じタブへ移動する。
@@ -54,7 +52,9 @@ export function MainNav({ groups, selectedGroupId, activeTab }: Props) {
             ))}
           </select>
         ) : (
-          <span className="truncate text-lg font-medium">{selected?.name ?? "グループなし"}</span>
+          <span className="truncate text-lg font-medium">
+            {groups.find((g) => g.id === selectedGroupId)?.name ?? "グループなし"}
+          </span>
         )}
         <Link href="/settings" aria-label="設定" className="shrink-0 rounded-md border p-2">
           {/* 歯車アイコン（Feather: settings）。アイコンライブラリは追加せずインラインで持つ。 */}

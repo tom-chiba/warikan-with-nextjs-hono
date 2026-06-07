@@ -32,7 +32,7 @@ export function ItemsPageInner() {
   // 一覧取得が済んでから比較し、すでにカレントなら何もしない（無駄な PUT を打たない）。
   // currentGroupId は依存に入れず effect 内でキャッシュから読む。依存に入れると、
   // セレクタでの切替（キャッシュ更新 → 遷移）の際に旧グループのページでこの effect が
-  // unmount 前に再実行され、旧グループを記録し直してしまう（切替が同一秒のタイで負ける）。
+  // unmount 前に再実行され、旧グループを記録し直して切替を上書きしてしまう。
   const loggedIn = !!session;
   const groupsLoaded = !!groupsData;
   useEffect(() => {

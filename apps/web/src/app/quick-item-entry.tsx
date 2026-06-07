@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemForm, type ItemFormValues } from "./groups/[groupId]/items/item-form";
@@ -30,12 +29,8 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
 
   return (
     <section className="flex w-full max-w-md flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-medium">{groupName} に購入品を入力</h2>
-        <Link href={`/groups/${groupId}/items`} className="shrink-0 text-sm underline">
-          購入品一覧
-        </Link>
-      </div>
+      {/* 一覧への導線は MainNav の「未精算 / 精算済」タブが担うため、ここには置かない（#51）。 */}
+      <h2 className="text-lg font-medium">{groupName} に購入品を入力</h2>
       {membersError ? (
         // members が空のままだと ItemForm が「読み込み中」を出し続けるため、失敗は明示する。
         <p className="text-sm text-red-500">メンバー一覧の取得に失敗しました。</p>
