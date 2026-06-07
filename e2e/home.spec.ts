@@ -26,10 +26,10 @@ test("ログイン済みでグループが 1 件なら、トップページで�
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel("パスワード").fill("password1234");
   await page.getByRole("button", { name: "サインアップ" }).click();
-  await expect(page.getByText("ログイン中:")).toBeVisible({ timeout: 30_000 });
-
-  // グループ 0 件のうちは作成への誘導が出る。
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible();
+  // ログイン状態になると常設ナビが出て、グループ 0 件のうちは作成への誘導が表示される（#51）。
+  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
+    timeout: 30_000,
+  });
 
   // グループを 1 件作成してトップへ戻ると、クイック入力フォームが表示される。
   await page.goto("/groups");

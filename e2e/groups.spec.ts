@@ -16,7 +16,10 @@ test("グループ作成→招待→別ユーザーが参加→メンバー一�
   await owner.getByLabel("メールアドレス").fill(ownerEmail);
   await owner.getByLabel("パスワード").fill("password1234");
   await owner.getByRole("button", { name: "サインアップ" }).click();
-  await expect(owner.getByText("ログイン中:")).toBeVisible({ timeout: 30_000 });
+  // ログイン状態になると常設ナビとグループ作成への誘導が出る（#51）。
+  await expect(owner.getByRole("link", { name: "グループを作成" })).toBeVisible({
+    timeout: 30_000,
+  });
 
   await owner.goto("/groups");
   await owner.getByLabel("グループ名").fill("E2E 旅行");
