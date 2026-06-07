@@ -4,8 +4,8 @@
 export const APP_NAME = "warikan";
 export const APP_DESCRIPTION = "割り勘アプリ";
 
-// 背景色。globals.css の --background(CSS 側は import できないため手動で同期)と揃える。
+// 背景色。globals.css の --paper(CSS 側は import できないため手動で同期)と揃える。
 export const THEME_COLORS = {
   light: "#ffffff",
-  dark: "#0a0a0a",
+  dark: "#0f1012",
 } as const;

@@ -1,27 +1,122 @@
 @import "tailwindcss";
 
-/* --background は src/lib/app-meta.ts の THEME_COLORS と手動で同期すること。 */
+/* デザイントークン（エディトリアル・シャープ, Issue #38）。
+   白地に墨色の鋭い罫線、ネイビーのアクセント、数字は等幅で主役に置く。
+   --paper は src/lib/app-meta.ts の THEME_COLORS と手動で同期すること。 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #ffffff;
+  --ink: #18181b;
+  --muted: #71717a;
+  --rule: #d4d4d8;
+  --accent: #1e3a5f;
+  --danger: #b3261e;
+  --ok: #166534;
+  --warn: #b45309;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #0f1012;
+    --ink: #e9e9e7;
+    --muted: #8e8e96;
+    --rule: #2c2c31;
+    --accent: #8fb3da;
+    --danger: #e0655c;
+    --ok: #6fbf8d;
+    --warn: #d9a23a;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  /* 英字・数字は Archivo、日本語はシステムのゴシックに落とす（日本語 Web フォントは
+     読み込まない。ルート・ItemForm の初期表示を重くしないため）。 */
+  --font-sans:
+    var(--font-archivo), "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP",
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* 共通 UI パーツ。ボタン・入力欄・見出しのトーンをここで一元化し、
+   各ページは btn / field 等のクラスを組み合わせて使う（Issue #38）。 */
+@layer components {
+  /* 見出し上の英字ラベル（エディトリアルのキッカー）。 */
+  .kicker {
+    @apply text-[11px] font-bold uppercase tracking-[0.25em] text-accent;
+  }
+
+  /* ページ見出し。 */
+  .headline {
+    @apply text-2xl font-black tracking-tight;
+  }
+
+  /* セクション見出し（太罫線の下線付き）。合計などを右に並べる場合は
+     親の flex 行に section-rule を付けて使う。 */
+  .section-title {
+    @apply text-base font-extrabold tracking-wide;
+  }
+
+  .section-rule {
+    @apply border-b-2 border-ink pb-1.5;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-none border-2 border-ink px-4 py-2 text-sm font-bold tracking-wide transition-colors disabled:pointer-events-none disabled:opacity-40;
+  }
+
+  .btn-fill {
+    @apply bg-ink text-paper hover:border-accent hover:bg-accent hover:text-paper;
+  }
+
+  .btn-line {
+    @apply bg-transparent text-ink hover:bg-ink hover:text-paper;
+  }
+
+  .btn-line-danger {
+    @apply border-danger bg-transparent text-danger hover:bg-danger hover:text-paper;
+  }
+
+  .btn-fill-danger {
+    @apply border-danger bg-danger text-paper hover:opacity-85;
+  }
+
+  /* btn と併用してサイズだけ落とす（罫線も 1px に細める）。 */
+  .btn-sm {
+    @apply border px-3 py-1.5 text-xs;
+  }
+
+  .field {
+    @apply w-full rounded-none border border-ink bg-transparent px-3 py-2 transition-colors placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20;
+  }
+
+  /* 補足・エラー・成功のテキスト表示。 */
+  .note-muted {
+    @apply text-sm text-muted;
+  }
+
+  .note-danger {
+    @apply text-sm font-medium text-danger;
+  }
+
+  .note-ok {
+    @apply text-sm font-medium text-ok;
+  }
+
+  /* 控えめなテキストリンク（戻る導線など）。 */
+  .link-quiet {
+    @apply text-sm font-bold text-muted underline underline-offset-4 transition-colors hover:text-ink;
+  }
 }
