@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { AuthVariables, DbVariables } from "../context";
 import { group, groupMember } from "../db/schema";
 import { buildGroupList } from "../lib/group-list";
+import { selectGroupMembers } from "../lib/group-members";
 
 // /groups のコレクションレベル（:groupId を伴わない）ルート。
 // メンバーシップは不要だがログインは必須なため、index.ts 側で requireAuth() + provideDb() を適用する。
@@ -55,5 +56,16 @@ export const groupsCollection = new Hono<{
 
     // カレントグループ = 最後に開いたグループ（last_viewed_at が最大の行）。一度も記録がなければ null。
     // 一覧取得に同梱することで、カレント解決のための追加の往復を発生させない（#51）。
-    return c.json(buildGroupList(rows));
+    const { groups, currentGroupId } = buildGroupList(rows);
+
+    // クイック入力（ルート /）が最初に表示するグループ = カレント、無ければ先頭
+    //（web 側 resolveCurrentGroup と同じフォールバック）。そのメンバーを同梱して
+    // ルートページの members 往復を 1 つ消す（初期表示は session → groups → members の
+    // 直列 3 往復で、RTT に対し 3 倍で効くことを実測済み）。DB クエリは増えるが往復は増えない。
+    const seedGroupId = currentGroupId ?? groups[0]?.id ?? null;
+    const currentGroupMembers = seedGroupId
+      ? { groupId: seedGroupId, members: await selectGroupMembers(db, seedGroupId) }
+      : null;
+
+    return c.json({ groups, currentGroupId, currentGroupMembers });
   });

@@ -109,13 +109,17 @@ describe("GET /groups（所属グループ一覧）", () => {
     expect(groups.map((g) => g.name)).not.toContain("他人のグループ");
   });
 
-  it("所属が 0 件なら空配列を返す", async () => {
+  it("所属が 0 件なら空配列を返す（同梱メンバーも null）", async () => {
     const cookie = await signUpAndGetCookie("empty-list@example.com");
 
     const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ groups: [], currentGroupId: null });
+    expect(await res.json()).toEqual({
+      groups: [],
+      currentGroupId: null,
+      currentGroupMembers: null,
+    });
   });
 
   it("未ログインなら 401", async () => {
@@ -158,5 +162,49 @@ describe("GET /groups（所属グループ一覧）", () => {
 
     const body = (await res.json()) as { currentGroupId: string | null };
     expect(body.currentGroupId).toBe(g2);
+  });
+
+  // クイック入力が最初に表示するグループのメンバー同梱（初期表示の members 往復削減）。
+  type GroupsBody = {
+    currentGroupId: string | null;
+    currentGroupMembers: {
+      groupId: string;
+      members: { userId: string; name: string; email: string; role: string }[];
+    } | null;
+  };
+
+  it("カレントグループがあれば、そのメンバー一覧が同梱される", async () => {
+    const cookie = await signUpAndGetCookie("seed-current@example.com");
+    const userId = await getUserId(env.DB, "seed-current@example.com");
+    const g1 = await createGroup(cookie, "旅行");
+    const g2 = await createGroup(cookie, "飲み会");
+    await SELF.fetch(`${BASE}/groups/${g1}/last-viewed`, { method: "PUT", headers: { cookie } });
+
+    const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
+
+    const body = (await res.json()) as GroupsBody;
+    expect(body.currentGroupId).toBe(g1);
+    expect(body.currentGroupMembers?.groupId).toBe(g1);
+    expect(body.currentGroupMembers?.members).toHaveLength(1);
+    expect(body.currentGroupMembers?.members[0]).toMatchObject({ userId, role: "owner" });
+    // g2 のメンバーは同梱されない（カレントの 1 グループ分のみ）。
+    expect(body.currentGroupMembers?.groupId).not.toBe(g2);
+  });
+
+  it("カレント未記録なら一覧先頭のグループのメンバーが同梱される（web のフォールバックと同じ）", async () => {
+    const cookie = await signUpAndGetCookie("seed-fallback@example.com");
+    await createGroup(cookie, "グループA");
+    await createGroup(cookie, "グループB");
+
+    const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
+
+    // 同一秒内の作成は joinedAt が同値になり group.id でタイブレークされるため、
+    // 「どちらが先頭か」は固定せず、レスポンス自身の一覧先頭と一致することを検証する
+    //（web の resolveCurrentGroup も同じ一覧の先頭へフォールバックする）。
+    const body = (await res.json()) as GroupsBody & { groups: { id: string }[] };
+    expect(body.currentGroupId).toBeNull();
+    expect(body.groups).toHaveLength(2);
+    expect(body.currentGroupMembers?.groupId).toBe(body.groups[0].id);
+    expect(body.currentGroupMembers?.members).toHaveLength(1);
   });
 });

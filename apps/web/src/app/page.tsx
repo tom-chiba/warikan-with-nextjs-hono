@@ -13,10 +13,11 @@ import { QuickItemEntry } from "./quick-item-entry";
 export default function Home() {
   const { data: session, isPending, error, refetch } = useSession();
 
-  // 所属グループ一覧。ログイン済みのときだけ取得する。
+  // 所属グループ一覧。セッション解決を待たずに並列で取得を開始する（直列 3 往復 → 2 往復）。
+  // 未ログインなら 401 で失敗するが、その場合は下の !session 分岐で AuthPanel を出すため
+  // エラーは画面に出ない（リトライもしない。サインイン後は SessionCacheBoundary が再取得させる）。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
-  // isPending は enabled: false（未ログイン）でも true になるため、実際に取得中かは isLoading で見る。
-  const { data: groupsData, isLoading: groupsLoading, isError: groupsError } = useGroups(!!session);
+  const { data: groupsData, isLoading: groupsLoading, isError: groupsError } = useGroups(true);
 
   if (isPending) {
     return <SessionPending />;

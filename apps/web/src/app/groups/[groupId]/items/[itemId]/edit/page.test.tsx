@@ -22,6 +22,8 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => searchParamsMock(),
 }));
 vi.mock("@/lib/api-client", () => ({
+  // use-groups が 401 時に参照する実体もモックに持たせる（欠けると 401 系テスト追加時に new undefined() で落ちる）。
+  UnauthorizedError: class extends Error {},
   apiClient: {
     groups: {
       ":groupId": {

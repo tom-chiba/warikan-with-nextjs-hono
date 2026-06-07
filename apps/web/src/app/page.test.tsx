@@ -12,10 +12,12 @@ vi.mock("@/lib/auth-client", () => ({
 }));
 
 // 所属グループ一覧の取得（useGroups → apiClient.groups.$get）をモックする。
+// UnauthorizedError は use-groups が 401 時に参照するため、モックにも実体を持たせる。
 vi.mock("@/lib/api-client", () => ({
   apiClient: {
     groups: { $get: (...args: unknown[]) => groupsGetMock(...args) },
   },
+  UnauthorizedError: class extends Error {},
 }));
 
 // AuthPanel の内部は auth-panel.test.tsx が担うため、ここでは差し替えて配置だけを検証する。
@@ -171,4 +173,17 @@ test("グループ一覧の取得に失敗したらエラーを表示し、ク�
 
   expect(await screen.findByText("グループ一覧の取得に失敗しました。")).toBeInTheDocument();
   expect(screen.queryByText(/クイック入力フォーム/)).not.toBeInTheDocument();
+});
+
+test("未ログインでも groups は並列発火し、401 でも認証フォームにエラーを出さない", async () => {
+  useSessionMock.mockReturnValue({ data: null, isPending: false, error: null });
+  groupsGetMock.mockResolvedValue({ ok: false, status: 401, json: async () => ({}) });
+
+  renderWithClient(<Home />);
+
+  // セッション解決を待たずに発火している（直列 3 往復 → 2 往復の前提）。
+  expect(groupsGetMock).toHaveBeenCalledTimes(1);
+  expect(await screen.findByText("認証パネル")).toBeInTheDocument();
+  // 401 は未ログインの正常系なのでエラー文言は出さない。
+  expect(screen.queryByText("グループ一覧の取得に失敗しました。")).not.toBeInTheDocument();
 });
