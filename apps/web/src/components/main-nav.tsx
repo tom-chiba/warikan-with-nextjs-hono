@@ -35,15 +35,8 @@ const gearIcon = (
   </svg>
 );
 
-// 下線タブ（エディトリアル・シャープ, Issue #38）。アクティブは太い墨色の下線 + 強い字、
-// 非アクティブは透明下線で高さを揃え、ホバーで文字色だけ立てる。
-// active のみに依存する純関数なのでモジュールレベルに置き、レンダーごとの再生成を避ける。
-const tabClass = (active: boolean) =>
-  `-mb-px border-b-3 px-1 pb-2 text-sm tracking-wide transition-colors ${
-    active
-      ? "border-ink font-extrabold text-ink"
-      : "border-transparent font-bold text-muted hover:text-ink"
-  }`;
+// 下線タブの意匠は globals.css の .tab / .tab-active に一元化（AuthPanel と共用）。
+const tabClass = (active: boolean) => (active ? "tab tab-active" : "tab");
 
 // メイン 3 ページ（入力 / 未精算 / 精算済）の常設ナビゲーション（#51）。
 // ヘッダー行にグループ切替セレクタと設定（歯車）リンク、その下に 3 タブを置く。
@@ -124,16 +117,10 @@ export function MainNav({ groups, selectedGroupId, activeTab, loading = false }:
         ) : (
           // グループ未所属のときは一覧を開けないため、タブを不活性表示にする。
           <>
-            <span
-              aria-disabled="true"
-              className="-mb-px border-b-3 border-transparent px-1 pb-2 text-sm font-bold tracking-wide text-muted/50"
-            >
+            <span aria-disabled="true" className="tab-disabled">
               未精算
             </span>
-            <span
-              aria-disabled="true"
-              className="-mb-px border-b-3 border-transparent px-1 pb-2 text-sm font-bold tracking-wide text-muted/50"
-            >
+            <span aria-disabled="true" className="tab-disabled">
               精算済
             </span>
           </>
