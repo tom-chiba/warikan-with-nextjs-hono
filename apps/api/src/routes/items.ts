@@ -5,7 +5,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { DbVariables, GroupMemberVariables } from "../context";
 import { groupMember, item, itemPayment, itemShare } from "../db/schema";
-import { groupByItem, makeRows, sumAmount, validateAmounts } from "../lib/items";
+import { loadItemAmounts } from "../lib/item-amounts";
+import { makeRows, sumAmount, validateAmounts } from "../lib/items";
 
 // メンバーごとの金額入力（支払額・割勘金額の各行）。amount は正の整数（円）。
 // 0 円（支払い／負担なし）の行はそもそも送らない仕様のため positive で弾く。
@@ -111,14 +112,7 @@ export const items = new Hono<{
         .orderBy(desc(item.createdAt));
 
       const ids = rows.map((r) => r.id);
-      const payments = ids.length
-        ? await db.select().from(itemPayment).where(inArray(itemPayment.itemId, ids))
-        : [];
-      const shares = ids.length
-        ? await db.select().from(itemShare).where(inArray(itemShare.itemId, ids))
-        : [];
-      const paymentsByItem = groupByItem(payments);
-      const sharesByItem = groupByItem(shares);
+      const { paymentsByItem, sharesByItem } = await loadItemAmounts(db, ids);
 
       return c.json({
         items: rows.map((r) => {
@@ -264,7 +258,10 @@ export const items = new Hono<{
     async (c) => {
       const member = c.get("groupMember");
       const db = c.get("db");
-      const { itemIds, transfers } = c.req.valid("json");
+      const { itemIds: rawItemIds, transfers } = c.req.valid("json");
+      // スキーマは重複 id を許すため、先に除去して以後は一意な配列として扱う。
+      // SQL の IN は重複を無視するので挙動は変わらず、下の鮮度チェックが素直な件数比較になる。
+      const itemIds = [...new Set(rawItemIds)];
 
       // 対象アイテムを取得する（groupId 一致・未精算のみ）。選択された id と一致しなければ
       // クライアントの一覧が古い（削除・精算済み・他グループ混入）ので拒否する。
@@ -279,7 +276,7 @@ export const items = new Hono<{
           ),
         );
       const foundIds = rows.map((r) => r.id);
-      if (foundIds.length !== new Set(itemIds).size) {
+      if (foundIds.length !== itemIds.length) {
         return c.json(
           {
             error:
@@ -290,13 +287,8 @@ export const items = new Hono<{
       }
 
       // 対象アイテムの payments / shares から送金リストを再計算し、提示済みのものと突き合わせる。
-      const payments = await db
-        .select()
-        .from(itemPayment)
-        .where(inArray(itemPayment.itemId, foundIds));
-      const shares = await db.select().from(itemShare).where(inArray(itemShare.itemId, foundIds));
-      const paymentsByItem = groupByItem(payments);
-      const sharesByItem = groupByItem(shares);
+      // 読み込みは GET /items と同じ loadItemAmounts に揃える（一覧表示と検証の入力を一致させる）。
+      const { paymentsByItem, sharesByItem } = await loadItemAmounts(db, foundIds);
       const expected = computeSettlements(
         foundIds.map((id) => ({
           payments: paymentsByItem.get(id) ?? [],
