@@ -25,7 +25,14 @@ function renderUseGroups() {
 
 test("同梱された currentGroupMembers を ['members', groupId] キャッシュへ先回りで取り込む", async () => {
   const members = [
-    { userId: "u1", name: "太郎", email: "t@example.com", role: "owner", joinedAt: "x" },
+    {
+      userId: "u1",
+      name: "太郎",
+      displayName: null,
+      email: "t@example.com",
+      role: "owner",
+      joinedAt: "x",
+    },
   ];
   groupsGetMock.mockResolvedValue({
     ok: true,
@@ -47,8 +54,22 @@ test("['members', groupId] キャッシュが既にあれば同梱データで�
   // 同梱データは groups リクエスト発出時点のスナップショット。メンバー変更後に取得した
   // 新しい members キャッシュを、遅れて着弾した古い groups レスポンスが潰さないこと。
   const fresh = [
-    { userId: "u1", name: "太郎", email: "t@example.com", role: "owner", joinedAt: "x" },
-    { userId: "u2", name: "次郎", email: "j@example.com", role: "member", joinedAt: "y" },
+    {
+      userId: "u1",
+      name: "太郎",
+      displayName: null,
+      email: "t@example.com",
+      role: "owner",
+      joinedAt: "x",
+    },
+    {
+      userId: "u2",
+      name: "次郎",
+      displayName: null,
+      email: "j@example.com",
+      role: "member",
+      joinedAt: "y",
+    },
   ];
   groupsGetMock.mockResolvedValue({
     ok: true,

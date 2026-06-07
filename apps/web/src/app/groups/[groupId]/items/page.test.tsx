@@ -90,8 +90,22 @@ const lunchItem = {
 
 const members = {
   members: [
-    { userId: "owner", name: "オーナー", email: "o@example.com", role: "owner", joinedAt: "x" },
-    { userId: "friend", name: "フレンド", email: "f@example.com", role: "member", joinedAt: "y" },
+    {
+      userId: "owner",
+      name: "オーナー",
+      displayName: null,
+      email: "o@example.com",
+      role: "owner",
+      joinedAt: "x",
+    },
+    {
+      userId: "friend",
+      name: "フレンド",
+      displayName: null,
+      email: "f@example.com",
+      role: "member",
+      joinedAt: "y",
+    },
   ],
 };
 

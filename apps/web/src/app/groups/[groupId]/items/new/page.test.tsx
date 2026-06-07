@@ -44,10 +44,18 @@ function setTwoMembers() {
     ok: true,
     json: async () => ({
       members: [
-        { userId: "u1", name: "わたし", email: "me@example.com", role: "owner", joinedAt: nowIso },
+        {
+          userId: "u1",
+          name: "わたし",
+          displayName: null,
+          email: "me@example.com",
+          role: "owner",
+          joinedAt: nowIso,
+        },
         {
           userId: "u2",
           name: "ともだち",
+          displayName: null,
           email: "f@example.com",
           role: "member",
           joinedAt: nowIso,
