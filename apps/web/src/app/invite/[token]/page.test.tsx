@@ -18,7 +18,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 vi.mock("@/app/auth-panel", () => ({
-  AuthPanel: () => <div>認証パネル</div>,
+  AuthPanel: ({ defaultMode }: { defaultMode?: string }) => (
+    <div>認証パネル: {defaultMode ?? "signIn"}</div>
+  ),
 }));
 // セッション状態表示の文言は session-states.test.tsx が担うため、ここでは配置だけを検証する。
 vi.mock("@/components/session-states", () => ({
@@ -54,13 +56,16 @@ test("セッション確認中はローディング表示を出す", () => {
   expect(screen.getByText("セッション確認中画面")).toBeInTheDocument();
 });
 
-test("未ログイン時はサインインのための認証パネルを表示する", () => {
+test("未ログイン時はサインアップを初期表示にした認証パネルを表示する", () => {
   useSessionMock.mockReturnValue({ data: null, isPending: false });
 
   renderWithClient(<InvitePage />);
 
-  expect(screen.getByText("参加するにはサインインしてください。")).toBeInTheDocument();
-  expect(screen.getByText("認証パネル")).toBeInTheDocument();
+  expect(
+    screen.getByText("参加するにはサインアップまたはサインインしてください。"),
+  ).toBeInTheDocument();
+  // 招待の主な流入は新規ユーザーのため、サインアップタブが初期表示であること（#60）。
+  expect(screen.getByText("認証パネル: signUp")).toBeInTheDocument();
 });
 
 test("有効な招待で参加すると、そのグループ画面へ遷移する", async () => {

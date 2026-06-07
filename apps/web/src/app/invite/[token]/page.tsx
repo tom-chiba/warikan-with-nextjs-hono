@@ -41,7 +41,8 @@ export default function InvitePage() {
   }
 
   // メンバーは全員アカウント必須。未ログインならサインイン/サインアップへ誘導する。
-  // サインインするとセッションが更新され、このページが参加確認の表示に切り替わる。
+  // 認証が通るとセッションが更新され、このページが参加確認の表示に切り替わる。
+  // 招待リンクの主な流入はアカウント未保有の新規ユーザーのため、サインアップを初期表示にする。
   if (!session) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
@@ -49,8 +50,8 @@ export default function InvitePage() {
           <span className="kicker">Invitation</span>
           <h1 className="headline">グループへの招待</h1>
         </div>
-        <p className="note-muted">参加するにはサインインしてください。</p>
-        <AuthPanel />
+        <p className="note-muted">参加するにはサインアップまたはサインインしてください。</p>
+        <AuthPanel defaultMode="signUp" />
       </main>
     );
   }
