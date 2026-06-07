@@ -1,6 +1,7 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
+import { renderWithClient } from "@/test/render-with-client";
 
 // auth-client をモックする。vi.hoisted で巻き上げ順の問題を回避する。
 const { changeEmailMock } = vi.hoisted(() => ({
@@ -20,8 +21,9 @@ afterEach(() => {
 
 const CURRENT_EMAIL = "me@example.com";
 
+// EmailChangeForm は成功時にメンバー一覧キャッシュを無効化するため QueryClient が必要。
 function renderForm() {
-  render(<EmailChangeForm currentEmail={CURRENT_EMAIL} />);
+  renderWithClient(<EmailChangeForm currentEmail={CURRENT_EMAIL} />);
 }
 
 async function openForm() {

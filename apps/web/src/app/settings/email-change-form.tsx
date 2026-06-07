@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
@@ -7,6 +8,7 @@ import { authClient } from "@/lib/auth-client";
 // 編集中フラグ・入力値・エラー/成功は行内の関心事なのでここに閉じ込め、
 // ページ側は設定ハブの構成に集中させる（#64 の MemberRow と同じ方針）。
 export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +35,10 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
         return;
       }
       // 成功時はセッション Cookie が新メールで更新され、useSession の自動再取得で
-      // 表示中のメールアドレスも更新される。フォームを閉じて成功メッセージを示す。
+      // 表示中のメールアドレスも更新される。メールはグループのメンバー一覧
+      //（["members", groupId] キャッシュ）にも表示されるため、全グループ分を無効化して
+      // 次回表示時に新メールへ揃える。フォームを閉じて成功メッセージを示す。
+      await queryClient.invalidateQueries({ queryKey: ["members"] });
       setSuccess(true);
       setEditing(false);
     } catch {

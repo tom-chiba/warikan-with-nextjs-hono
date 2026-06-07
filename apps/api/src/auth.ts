@@ -57,7 +57,11 @@ export function createAuth(env: Env) {
           // hooks.before はエンドポイント本体の認証チェックより先に走るため、無条件に
           // 重複を 400 で返すと、未認証でもステータス差（400/401）でメールの存在有無が
           // 判別できてしまう。セッションが無ければ何もせず、本体の 401 に委ねる。
-          const session = await getSessionFromCtx(ctx);
+          // disableCookieCache: ここで解決したセッションは ctx.context.session にメモ化され、
+          // 本体の sensitiveSessionMiddleware（DB 再検証）がそれを再利用する。将来
+          // session.cookieCache を有効化しても失効済みセッションが素通りしないよう、
+          // メモ化される値を最初から DB 検証済みにしておく。
+          const session = await getSessionFromCtx(ctx, { disableCookieCache: true });
           if (!session) {
             return;
           }

@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { getUserId, signUpAndGetCookie } from "../helpers/auth-session";
+import { getUserId, signInAndGetCookie, signUpAndGetCookie } from "../helpers/auth-session";
 
 const BASE = env.BETTER_AUTH_URL;
 
@@ -26,22 +26,13 @@ function changePassword(
   });
 }
 
+// サインインの成否（ステータス）を検証する用途のため、レスポンスをそのまま返す。
 function signIn(email: string, password: string) {
   return SELF.fetch(`${BASE}/api/auth/sign-in/email`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-}
-
-// 2 つめのセッション（別端末相当）を作るためのサインインヘルパー。
-async function signInAndGetCookie(email: string, password = "password1234"): Promise<string> {
-  const res = await signIn(email, password);
-  if (res.status !== 200) {
-    throw new Error(`sign-in failed: ${res.status}`);
-  }
-  const cookies = res.headers.getSetCookie();
-  return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
 }
 
 describe("POST /api/auth/change-password（パスワード変更）", () => {
