@@ -53,8 +53,9 @@ export default function NewItemPage() {
         onSubmit={handleSubmit}
       />
 
-      <Link href={`/groups/${groupId}`} className="rounded-md border px-4 py-2">
-        グループへ戻る
+      {/* 日常動線の戻り先は未精算一覧（グループ詳細は設定動線のページ、#51）。 */}
+      <Link href={`/groups/${groupId}/items`} className="rounded-md border px-4 py-2">
+        購入品一覧へ戻る
       </Link>
     </main>
   );

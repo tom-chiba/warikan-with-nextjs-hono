@@ -14,6 +14,20 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const groups = new Hono<{
   Variables: GroupMemberVariables & DbVariables;
 }>()
+  // このグループを「最後に開いた」として記録する（カレントグループの更新、#51）。
+  // メンバーシップは requireGroupMember で検証済みのため、自分のメンバーシップ行の
+  // last_viewed_at を打つだけでよい。GET /groups が最大値の行をカレントとして返す。
+  .put("/:groupId/last-viewed", async (c) => {
+    const member = c.get("groupMember");
+    const db = c.get("db");
+
+    await db
+      .update(groupMember)
+      .set({ lastViewedAt: new Date() })
+      .where(and(eq(groupMember.groupId, member.groupId), eq(groupMember.userId, member.userId)));
+
+    return c.json({ ok: true });
+  })
   // グループのメンバー一覧を返す。各メンバーの表示用情報（name/email）と role/joinedAt を含む。
   .get("/:groupId/members", async (c) => {
     const member = c.get("groupMember");

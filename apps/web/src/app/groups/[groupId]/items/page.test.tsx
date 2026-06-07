@@ -12,6 +12,8 @@ const {
   unsettleMock,
   searchParamsMock,
   confirmMock,
+  groupsGetMock,
+  lastViewedPutMock,
 } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
   itemsGetMock: vi.fn(),
@@ -21,6 +23,8 @@ const {
   unsettleMock: vi.fn(),
   searchParamsMock: vi.fn(),
   confirmMock: vi.fn(),
+  groupsGetMock: vi.fn(),
+  lastViewedPutMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
@@ -33,6 +37,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/api-client", () => ({
   apiClient: {
     groups: {
+      $get: (...args: unknown[]) => groupsGetMock(...args),
       ":groupId": {
         items: {
           $get: (...args: unknown[]) => itemsGetMock(...args),
@@ -41,11 +46,25 @@ vi.mock("@/lib/api-client", () => ({
         members: { $get: (...args: unknown[]) => membersGetMock(...args) },
         settlements: { $post: (...args: unknown[]) => settleMock(...args) },
         unsettlements: { $post: (...args: unknown[]) => unsettleMock(...args) },
+        "last-viewed": { $put: (...args: unknown[]) => lastViewedPutMock(...args) },
       },
     },
   },
 }));
-
+// MainNav の内部は main-nav.test.tsx が担うため、渡された props の確認に留める。
+vi.mock("@/components/main-nav", () => ({
+  MainNav: ({
+    selectedGroupId,
+    activeTab,
+  }: {
+    selectedGroupId: string | null;
+    activeTab: string;
+  }) => (
+    <div>
+      メインナビ: {selectedGroupId ?? "選択なし"} / {activeTab}
+    </div>
+  ),
+}));
 import ItemsPage from "./page";
 
 Object.defineProperty(window, "confirm", { value: confirmMock, configurable: true });
@@ -79,6 +98,15 @@ beforeEach(() => {
   membersGetMock.mockResolvedValue({ ok: true, json: async () => members });
   // 既定は未精算ビュー（クエリパラメータなし）。
   searchParamsMock.mockReturnValue(new URLSearchParams(""));
+  // MainNav 用のグループ一覧。既定では表示中の g1 がカレント（last-viewed 同期は走らない）。
+  groupsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      groups: [{ id: "g1", name: "旅行", role: "owner" }],
+      currentGroupId: "g1",
+    }),
+  });
+  lastViewedPutMock.mockResolvedValue({ ok: true });
 });
 
 afterEach(() => {
@@ -339,4 +367,78 @@ test("精算済ビューでも削除ボタンで該当アイテムの DELETE が
   await waitFor(() => {
     expect(itemDeleteMock).toHaveBeenCalledWith({ param: { groupId: "g1", itemId: "i1" } });
   });
+});
+
+// ---- 常設ナビとカレントグループ同期（#51）----
+
+test("未精算ビューではナビに表示中グループと unsettled タブが渡される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  expect(await screen.findByText("メインナビ: g1 / unsettled")).toBeInTheDocument();
+});
+
+test("精算済ビューではナビに settled タブが渡される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+
+  renderSettledView();
+
+  expect(await screen.findByText("メインナビ: g1 / settled")).toBeInTheDocument();
+});
+
+test("カレントでないグループを開いたらカレントとして記録する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+  // サーバー上のカレントは g2。URL で開いた g1 がカレントになるよう同期される。
+  groupsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      groups: [
+        { id: "g1", name: "旅行", role: "owner" },
+        { id: "g2", name: "飲み会", role: "member" },
+      ],
+      currentGroupId: "g2",
+    }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  await waitFor(() => {
+    expect(lastViewedPutMock).toHaveBeenCalledWith({ param: { groupId: "g1" } });
+  });
+});
+
+test("すでにカレントのグループを開いたときは記録を打ち直さない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await screen.findByText("未精算のアイテムはありません。");
+  expect(lastViewedPutMock).not.toHaveBeenCalled();
+});
+
+test("所属しないグループの URL を開いたらビューを出さず案内し、カレント記録もしない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+  // URL の g1 は所属一覧に存在しない（脱退済み等）。残存グループ g2 をナビに出す。
+  groupsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      groups: [{ id: "g2", name: "飲み会", role: "member" }],
+      currentGroupId: "g2",
+    }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  expect(await screen.findByText(/このグループのアイテムは表示できません/)).toBeInTheDocument();
+  // 脱出経路として残存グループを選択したナビとホームへのリンクを出す。
+  expect(screen.getByText("メインナビ: g2 / unsettled")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "ホームへ" })).toHaveAttribute("href", "/");
+  expect(screen.queryByText("未精算のアイテムはありません。")).not.toBeInTheDocument();
+  expect(lastViewedPutMock).not.toHaveBeenCalled();
 });

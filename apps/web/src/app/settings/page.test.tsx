@@ -3,15 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 // auth-client と next/navigation をモックする。vi.hoisted で巻き上げ順の問題を回避する。
-const { useSessionMock, deleteUserMock, pushMock, confirmMock } = vi.hoisted(() => ({
+const { useSessionMock, deleteUserMock, signOutMock, pushMock, confirmMock } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
   deleteUserMock: vi.fn(),
+  signOutMock: vi.fn(),
   pushMock: vi.fn(),
   confirmMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
   useSession: () => useSessionMock(),
+  signOut: (...args: unknown[]) => signOutMock(...args),
   authClient: { deleteUser: deleteUserMock },
 }));
 vi.mock("next/navigation", () => ({
@@ -68,6 +70,26 @@ test("ログイン中は名前とメールアドレスを表示する", () => {
 
   expect(screen.getByText("テストユーザー")).toBeInTheDocument();
   expect(screen.getByText("me@example.com")).toBeInTheDocument();
+});
+
+test("設定ハブとしてグループ管理とホームへの導線を表示する", () => {
+  useSessionMock.mockReturnValue(loggedIn);
+
+  render(<SettingsPage />);
+
+  expect(screen.getByRole("link", { name: "グループ管理へ" })).toHaveAttribute("href", "/groups");
+  expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/");
+});
+
+test("サインアウトするとホームへ遷移する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  signOutMock.mockResolvedValue(undefined);
+
+  render(<SettingsPage />);
+  await userEvent.click(screen.getByRole("button", { name: "サインアウト" }));
+
+  expect(signOutMock).toHaveBeenCalled();
+  await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
 });
 
 test("パスワード未入力では削除ボタンが無効になる", () => {

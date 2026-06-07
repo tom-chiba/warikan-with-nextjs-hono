@@ -101,6 +101,10 @@ export const groupMember = sqliteTable(
     joinedAt: integer("joined_at", { mode: "timestamp" })
       .$defaultFn(() => new Date())
       .notNull(),
+    // ユーザーがこのグループを最後に開いた（選択した）時刻。最大の行がカレントグループになる（#51）。
+    // メンバーシップ行に持たせることで、脱退時は行ごと消えて無効なカレント参照が残らない。
+    // 秒精度だと素早いグループ切替で同値（タイ）になり順序が不定になるため、ミリ秒精度で持つ。
+    lastViewedAt: integer("last_viewed_at", { mode: "timestamp_ms" }),
   },
   (t) => [primaryKey({ columns: [t.groupId, t.userId] })],
 );

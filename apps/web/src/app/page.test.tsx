@@ -9,7 +9,6 @@ const { useSessionMock, groupsGetMock } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/auth-client", () => ({
   useSession: () => useSessionMock(),
-  signOut: vi.fn(),
 }));
 
 // 所属グループ一覧の取得（useGroups → apiClient.groups.$get）をモックする。
@@ -29,6 +28,21 @@ vi.mock("./quick-item-entry", () => ({
   QuickItemEntry: ({ groupId, groupName }: { groupId: string; groupName: string }) => (
     <div>
       クイック入力フォーム: {groupName} ({groupId})
+    </div>
+  ),
+}));
+
+// MainNav の内部は main-nav.test.tsx が担うため、渡された props の確認に留める。
+vi.mock("@/components/main-nav", () => ({
+  MainNav: ({
+    selectedGroupId,
+    activeTab,
+  }: {
+    selectedGroupId: string | null;
+    activeTab: string;
+  }) => (
+    <div>
+      メインナビ: {selectedGroupId ?? "選択なし"} / {activeTab}
     </div>
   ),
 }));
@@ -53,8 +67,11 @@ const loggedIn = {
   error: null,
 };
 
-function setGroups(groups: { id: string; name: string; role: string }[]) {
-  groupsGetMock.mockResolvedValue({ ok: true, json: async () => ({ groups }) });
+function setGroups(
+  groups: { id: string; name: string; role: string }[],
+  currentGroupId: string | null = null,
+) {
+  groupsGetMock.mockResolvedValue({ ok: true, json: async () => ({ groups, currentGroupId }) });
 }
 
 test("セッション確認中はローディング表示を出す", () => {
@@ -79,31 +96,17 @@ test("セッション取得に失敗したらエラー表示を出す", () => {
   expect(screen.queryByText("認証パネル")).not.toBeInTheDocument();
 });
 
-test("未ログイン時は見出しと認証フォームを表示する", () => {
+test("未ログイン時は見出しと認証フォームを表示し、ナビは出さない", () => {
   useSessionMock.mockReturnValue({ data: null, isPending: false, error: null });
 
   renderWithClient(<Home />);
 
   expect(screen.getByRole("heading", { name: "warikan" })).toBeInTheDocument();
   expect(screen.getByText("認証パネル")).toBeInTheDocument();
+  expect(screen.queryByText(/メインナビ/)).not.toBeInTheDocument();
 });
 
-test("ログイン済み時はメールアドレスと各導線を表示する", async () => {
-  useSessionMock.mockReturnValue(loggedIn);
-  setGroups([]);
-
-  renderWithClient(<Home />);
-
-  // グループ取得の完了まで待ち、確定後の画面に対して検証する。
-  await screen.findByRole("link", { name: "グループを作成" });
-  expect(screen.getByText("me@example.com")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "グループ" })).toHaveAttribute("href", "/groups");
-  expect(screen.getByRole("link", { name: "アカウント設定" })).toHaveAttribute("href", "/settings");
-  expect(screen.getByRole("button", { name: "サインアウト" })).toBeInTheDocument();
-  expect(screen.queryByText("認証パネル")).not.toBeInTheDocument();
-});
-
-test("所属グループが 0 件なら作成への誘導を表示する", async () => {
+test("所属グループが 0 件なら作成への誘導とナビ（選択なし）を表示する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   setGroups([]);
 
@@ -115,6 +118,7 @@ test("所属グループが 0 件なら作成への誘導を表示する", async
     ),
   ).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "グループを作成" })).toHaveAttribute("href", "/groups");
+  expect(screen.getByText("メインナビ: 選択なし / entry")).toBeInTheDocument();
   expect(screen.queryByText(/クイック入力フォーム/)).not.toBeInTheDocument();
 });
 
@@ -125,22 +129,38 @@ test("所属グループが 1 件ならそのグループのクイック入力�
   renderWithClient(<Home />);
 
   expect(await screen.findByText("クイック入力フォーム: 旅行 (g1)")).toBeInTheDocument();
+  expect(screen.getByText("メインナビ: g1 / entry")).toBeInTheDocument();
 });
 
-test("所属グループが複数ならグループ選択への誘導を表示する", async () => {
+test("複数グループ所属時はカレントグループのクイック入力を表示する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
-  setGroups([
-    { id: "g1", name: "旅行", role: "owner" },
-    { id: "g2", name: "飲み会", role: "member" },
-  ]);
+  setGroups(
+    [
+      { id: "g1", name: "旅行", role: "owner" },
+      { id: "g2", name: "飲み会", role: "member" },
+    ],
+    "g2",
+  );
 
   renderWithClient(<Home />);
 
-  expect(await screen.findByRole("link", { name: "グループを選んで入力" })).toHaveAttribute(
-    "href",
-    "/groups",
+  expect(await screen.findByText("クイック入力フォーム: 飲み会 (g2)")).toBeInTheDocument();
+  expect(screen.getByText("メインナビ: g2 / entry")).toBeInTheDocument();
+});
+
+test("カレント未記録（currentGroupId が null）なら先頭グループへフォールバックする", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setGroups(
+    [
+      { id: "g1", name: "旅行", role: "owner" },
+      { id: "g2", name: "飲み会", role: "member" },
+    ],
+    null,
   );
-  expect(screen.queryByText(/クイック入力フォーム/)).not.toBeInTheDocument();
+
+  renderWithClient(<Home />);
+
+  expect(await screen.findByText("クイック入力フォーム: 旅行 (g1)")).toBeInTheDocument();
 });
 
 test("グループ一覧の取得に失敗したらエラーを表示し、クイック入力は出さない", async () => {

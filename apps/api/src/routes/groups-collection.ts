@@ -40,12 +40,32 @@ export const groupsCollection = new Hono<{
     // 自分が所属するグループだけを返す。group_member を起点に join し、
     // オーナー不在などのゴミデータ（group 単独行）を拾わないようにする（ADR-0010）。
     // joinedAt が同値（短時間に複数作成）でも順序が一意に定まるよう group.id をタイブレークに足す。
-    const groups = await db
-      .select({ id: group.id, name: group.name, role: groupMember.role })
+    const rows = await db
+      .select({
+        id: group.id,
+        name: group.name,
+        role: groupMember.role,
+        lastViewedAt: groupMember.lastViewedAt,
+      })
       .from(groupMember)
       .innerJoin(group, eq(groupMember.groupId, group.id))
       .where(eq(groupMember.userId, user.id))
       .orderBy(groupMember.joinedAt, group.id);
 
-    return c.json({ groups });
+    // カレントグループ = 最後に開いたグループ（last_viewed_at が最大の行）。一度も記録がなければ null。
+    // 一覧取得に同梱することで、カレント解決のための追加の往復を発生させない（#51）。
+    // 一覧の整形（lastViewedAt を外す）とカレント判定は 1 回の走査でまとめて行う。
+    const groups: Pick<(typeof rows)[number], "id" | "name" | "role">[] = [];
+    let currentGroupId: string | null = null;
+    let latest = 0;
+    for (const { id, name, role, lastViewedAt } of rows) {
+      groups.push({ id, name, role });
+      const viewedAt = lastViewedAt?.getTime() ?? 0;
+      if (viewedAt > latest) {
+        latest = viewedAt;
+        currentGroupId = id;
+      }
+    }
+
+    return c.json({ groups, currentGroupId });
   });

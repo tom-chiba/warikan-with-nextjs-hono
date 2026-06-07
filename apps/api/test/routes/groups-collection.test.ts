@@ -115,11 +115,48 @@ describe("GET /groups（所属グループ一覧）", () => {
     const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ groups: [] });
+    expect(await res.json()).toEqual({ groups: [], currentGroupId: null });
   });
 
   it("未ログインなら 401", async () => {
     const res = await SELF.fetch(`${BASE}/groups`);
     expect(res.status).toBe(401);
+  });
+
+  // カレントグループ（#51）: last_viewed_at が最大のグループを currentGroupId として同梱する。
+  it("どのグループも開いていなければ currentGroupId は null", async () => {
+    const cookie = await signUpAndGetCookie("no-current@example.com");
+    await createGroup(cookie, "旅行");
+
+    const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
+
+    const body = (await res.json()) as { currentGroupId: string | null };
+    expect(body.currentGroupId).toBeNull();
+  });
+
+  it("last-viewed を記録すると、そのグループが currentGroupId として返る", async () => {
+    const cookie = await signUpAndGetCookie("current@example.com");
+    const g1 = await createGroup(cookie, "旅行");
+    const g2 = await createGroup(cookie, "飲み会");
+
+    // g1 → g2 の順で開くと、後から開いた g2 がカレントになる。
+    const putRes = await SELF.fetch(`${BASE}/groups/${g1}/last-viewed`, {
+      method: "PUT",
+      headers: { cookie },
+    });
+    expect(putRes.status).toBe(200);
+    await SELF.fetch(`${BASE}/groups/${g2}/last-viewed`, { method: "PUT", headers: { cookie } });
+    // ミリ秒精度でもテスト実行が同一ミリ秒に収まる可能性はゼロではないため、
+    // g2 を明示的に未来へずらして「後から開いた方が勝つ」状態を決定的に作る。
+    await env.DB.prepare(
+      "UPDATE group_member SET last_viewed_at = last_viewed_at + 10 WHERE group_id = ?",
+    )
+      .bind(g2)
+      .run();
+
+    const res = await SELF.fetch(`${BASE}/groups`, { headers: { cookie } });
+
+    const body = (await res.json()) as { currentGroupId: string | null };
+    expect(body.currentGroupId).toBe(g2);
   });
 });

@@ -49,15 +49,11 @@ function setTwoMembers() {
   });
 }
 
-test("グループ名の見出し・購入品一覧への導線・入力フォームを表示する", async () => {
+test("グループ名の見出しと入力フォームを表示する", async () => {
   setTwoMembers();
   renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
 
   expect(screen.getByRole("heading", { name: "旅行 に購入品を入力" })).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "購入品一覧" })).toHaveAttribute(
-    "href",
-    "/groups/g1/items",
-  );
   expect(await screen.findByLabelText("わたし の支払額")).toBeInTheDocument();
   expect(membersGetMock).toHaveBeenCalledWith({ param: { groupId: "g1" } });
 });

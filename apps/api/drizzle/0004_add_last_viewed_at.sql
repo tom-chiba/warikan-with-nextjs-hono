@@ -1,0 +1,1 @@
+ALTER TABLE `group_member` ADD `last_viewed_at` integer;
