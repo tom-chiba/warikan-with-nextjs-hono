@@ -3,9 +3,19 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 // auth-client と next/navigation をモックする。vi.hoisted で巻き上げ順の問題を回避する。
-const { useSessionMock, deleteUserMock, signOutMock, pushMock, confirmMock } = vi.hoisted(() => ({
+const {
+  useSessionMock,
+  deleteUserMock,
+  changeEmailMock,
+  changePasswordMock,
+  signOutMock,
+  pushMock,
+  confirmMock,
+} = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
   deleteUserMock: vi.fn(),
+  changeEmailMock: vi.fn(),
+  changePasswordMock: vi.fn(),
   signOutMock: vi.fn(),
   pushMock: vi.fn(),
   confirmMock: vi.fn(),
@@ -14,7 +24,11 @@ const { useSessionMock, deleteUserMock, signOutMock, pushMock, confirmMock } = v
 vi.mock("@/lib/auth-client", () => ({
   useSession: () => useSessionMock(),
   signOut: (...args: unknown[]) => signOutMock(...args),
-  authClient: { deleteUser: deleteUserMock },
+  authClient: {
+    deleteUser: deleteUserMock,
+    changeEmail: changeEmailMock,
+    changePassword: changePasswordMock,
+  },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
@@ -70,6 +84,17 @@ test("ログイン中は名前とメールアドレスを表示する", () => {
 
   expect(screen.getByText("テストユーザー")).toBeInTheDocument();
   expect(screen.getByText("me@example.com")).toBeInTheDocument();
+});
+
+// フォームの開閉・送信の詳細は email-change-form.test.tsx / password-change-form.test.tsx で
+// 検証するため、ページでは変更フォームへの導線（変更ボタン）が出ていることだけ確認する。
+test("メールアドレスとパスワードの変更ボタンを表示する", () => {
+  useSessionMock.mockReturnValue(loggedIn);
+
+  render(<SettingsPage />);
+
+  expect(screen.getByRole("button", { name: "メールアドレスを変更" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "パスワードを変更" })).toBeInTheDocument();
 });
 
 test("設定ハブとしてグループ管理とホームへの導線を表示する", () => {
