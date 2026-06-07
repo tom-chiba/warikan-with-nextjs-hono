@@ -55,3 +55,39 @@ describe("保護ルート /groups/:groupId", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("PUT /groups/:groupId/last-viewed（カレントグループの記録）", () => {
+  it("メンバーは自分の last_viewed_at を記録できる", async () => {
+    const cookie = await signUpAndGetCookie("viewer@example.com");
+    const userId = await getUserId(env.DB, "viewer@example.com");
+    await joinGroup("group-viewed", userId, "member");
+
+    const res = await SELF.fetch(`${BASE}/groups/group-viewed/last-viewed`, {
+      method: "PUT",
+      headers: { cookie },
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    const row = await env.DB.prepare(
+      "SELECT last_viewed_at FROM group_member WHERE group_id = ? AND user_id = ?",
+    )
+      .bind("group-viewed", userId)
+      .first<{ last_viewed_at: number | null }>();
+    expect(row?.last_viewed_at).not.toBeNull();
+  });
+
+  it("所属しないグループには記録できない（403）", async () => {
+    const cookie = await signUpAndGetCookie("viewer-cross@example.com");
+    const userId = await getUserId(env.DB, "viewer-cross@example.com");
+    await joinGroup("group-mine", userId, "member");
+
+    const res = await SELF.fetch(`${BASE}/groups/group-others/last-viewed`, {
+      method: "PUT",
+      headers: { cookie },
+    });
+
+    expect(res.status).toBe(403);
+  });
+});
