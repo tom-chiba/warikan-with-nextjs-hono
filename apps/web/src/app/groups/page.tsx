@@ -114,6 +114,16 @@ export default function GroupsPage() {
           作成
         </button>
       </form>
+
+      {/* グループ管理は設定ハブ（/settings）配下の動線（#51）。 */}
+      <div className="flex gap-2">
+        <Link href="/settings" className="rounded-md border px-4 py-2">
+          設定へ戻る
+        </Link>
+        <Link href="/" className="rounded-md border px-4 py-2">
+          ホームへ
+        </Link>
+      </div>
     </main>
   );
 }

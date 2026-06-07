@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
-import { authClient, useSession } from "@/lib/auth-client";
+import { authClient, signOut, useSession } from "@/lib/auth-client";
 
-// アカウント設定ページ。アカウント情報の表示と、危険操作ゾーン（アカウント削除）を置く。
+// 設定ハブページ。日常動線から外したグループ管理への入り口と、アカウント情報・
+// サインアウト・危険操作ゾーン（アカウント削除）をここに集約する（#51）。
 // 削除は Better Auth の deleteUser（パスワード再入力方式）で行い、本人確認を伴う（#33）。
 export default function SettingsPage() {
   const { data: session, isPending } = useSession();
@@ -50,9 +52,26 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSignOut() {
+    // サインアウト後は未ログインのホーム（サインイン画面）へ戻す。
+    // クエリキャッシュの破棄は SessionCacheBoundary がセッション変化を検知して行う。
+    await signOut();
+    router.push("/");
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center gap-8 p-8">
-      <h1 className="text-2xl font-semibold">アカウント設定</h1>
+      <h1 className="text-2xl font-semibold">設定</h1>
+
+      <section className="flex w-full max-w-xs flex-col gap-3">
+        <h2 className="text-lg font-medium">グループ管理</h2>
+        <p className="text-sm text-zinc-500">
+          グループの作成・メンバーの招待や退出はこちらから行えます。
+        </p>
+        <Link href="/groups" className="rounded-md border px-4 py-2 text-center">
+          グループ管理へ
+        </Link>
+      </section>
 
       <section className="flex w-full max-w-xs flex-col gap-2">
         <h2 className="text-lg font-medium">アカウント情報</h2>
@@ -62,6 +81,13 @@ export default function SettingsPage() {
         <p className="text-sm">
           メール: <span className="font-mono">{session.user.email}</span>
         </p>
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="mt-1 self-start text-sm text-zinc-500 underline"
+        >
+          サインアウト
+        </button>
       </section>
 
       <section className="flex w-full max-w-xs flex-col gap-3 rounded-lg border border-red-300 p-4 dark:border-red-900">
@@ -89,6 +115,10 @@ export default function SettingsPage() {
           </button>
         </form>
       </section>
+
+      <Link href="/" className="rounded-md border px-4 py-2">
+        ホームへ戻る
+      </Link>
     </main>
   );
 }
