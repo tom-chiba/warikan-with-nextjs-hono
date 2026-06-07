@@ -36,6 +36,13 @@
       "when": 1780793693921,
       "tag": "0004_add_last_viewed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1780801994181,
+      "tag": "0005_add_item_list_index",
+      "breakpoints": true
     }
   ]
 }

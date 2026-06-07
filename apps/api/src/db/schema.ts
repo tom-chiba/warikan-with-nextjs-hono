@@ -135,26 +135,33 @@ export const groupInvitation = sqliteTable(
 );
 
 // 購入品。status は未精算/精算済の 2 状態。
-export const item = sqliteTable("item", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  groupId: text("group_id")
-    .notNull()
-    .references(() => group.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  purchasedOn: integer("purchased_on", { mode: "timestamp" }),
-  memo: text("memo"),
-  status: text("status", { enum: ["unsettled", "settled"] })
-    .notNull()
-    .default("unsettled"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .$defaultFn(() => new Date())
-    .notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" })
-    .$defaultFn(() => new Date())
-    .notNull(),
-});
+export const item = sqliteTable(
+  "item",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => group.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    purchasedOn: integer("purchased_on", { mode: "timestamp" }),
+    memo: text("memo"),
+    status: text("status", { enum: ["unsettled", "settled"] })
+      .notNull()
+      .default("unsettled"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  // 一覧取得（GET /items）は groupId + status で絞り createdAt 降順で返すため、
+  // 並び替えまでカバーする複合インデックスでテーブルフルスキャン + ソートを避ける。
+  // 精算/未精算更新の WHERE（groupId + status + id IN）も前 2 カラムで恩恵を受ける。
+  (t) => [index("item_group_id_status_created_at_idx").on(t.groupId, t.status, t.createdAt)],
+);
 
 // 各メンバーが実際に支払った額。(itemId, userId) で一意。
 export const itemPayment = sqliteTable(
