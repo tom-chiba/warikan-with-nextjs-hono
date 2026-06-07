@@ -5,10 +5,15 @@ import { signIn, signUp } from "@/lib/auth-client";
 
 type AuthMode = "signIn" | "signUp";
 
+const TAB_ORDER = ["signIn", "signUp"] as const;
+
 const TAB_LABELS: Record<AuthMode, string> = {
   signIn: "サインイン",
   signUp: "サインアップ",
 };
+
+// キー判定用の Set。キー押下ごとの配列生成と O(n) 走査を避ける。
+const TABLIST_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
 
 // サインアップ/サインインのフォーム。セッション状態による出し分けは呼び出し側で行う。
 // サインインに名前は不要なため、タブで画面を分けて名前フィールドの表示を出し分ける（#60）。
@@ -58,7 +63,7 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
 
   // WAI-ARIA タブパターンのキーボード操作。2 タブなので左右どちらの矢印でももう一方へ移す。
   function handleTablistKeyDown(e: KeyboardEvent) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    if (!TABLIST_KEYS.has(e.key)) return;
     e.preventDefault();
     const next: AuthMode =
       e.key === "Home"
@@ -80,7 +85,7 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
         onKeyDown={handleTablistKeyDown}
         className="flex gap-5 border-b border-rule"
       >
-        {(["signIn", "signUp"] as const).map((m) => (
+        {TAB_ORDER.map((m) => (
           <button
             key={m}
             type="button"
