@@ -45,8 +45,11 @@ export default function InvitePage() {
   if (!session) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-        <h1 className="text-2xl font-semibold">グループへの招待</h1>
-        <p className="text-sm text-zinc-500">参加するにはサインインしてください。</p>
+        <div className="flex flex-col items-center gap-1">
+          <span className="kicker">Invitation</span>
+          <h1 className="headline">グループへの招待</h1>
+        </div>
+        <p className="note-muted">参加するにはサインインしてください。</p>
         <AuthPanel />
       </main>
     );
@@ -73,18 +76,17 @@ export default function InvitePage() {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-      <h1 className="text-2xl font-semibold">グループへの招待</h1>
+      <div className="flex flex-col items-center gap-1">
+        <span className="kicker">Invitation</span>
+        <h1 className="headline">グループへの招待</h1>
+      </div>
 
-      {previewLoading && <p className="text-zinc-500">招待を確認中…</p>}
+      {previewLoading && <p className="note-muted">招待を確認中…</p>}
 
       {previewError && (
         <div className="flex flex-col items-center gap-3">
-          <p className="text-red-500">招待の確認中にエラーが発生しました。</p>
-          <button
-            type="button"
-            onClick={() => refetchPreview()}
-            className="rounded-md border px-4 py-2"
-          >
+          <p className="note-danger">招待の確認中にエラーが発生しました。</p>
+          <button type="button" onClick={() => refetchPreview()} className="btn btn-line">
             再試行
           </button>
         </div>
@@ -93,7 +95,7 @@ export default function InvitePage() {
       {preview && !preview.valid && (
         <div className="flex flex-col items-center gap-3">
           <p>この招待リンクは無効か、有効期限が切れています。</p>
-          <Link href="/groups" className="rounded-md border px-4 py-2">
+          <Link href="/groups" className="btn btn-line">
             グループ一覧へ
           </Link>
         </div>
@@ -102,9 +104,9 @@ export default function InvitePage() {
       {preview?.valid && preview.alreadyMember && (
         <div className="flex flex-col items-center gap-3">
           <p>
-            あなたは既に「<span className="font-medium">{preview.groupName}</span>」のメンバーです。
+            あなたは既に「<span className="font-bold">{preview.groupName}</span>」のメンバーです。
           </p>
-          <Link href={`/groups/${preview.groupId}`} className="rounded-md border px-4 py-2">
+          <Link href={`/groups/${preview.groupId}`} className="btn btn-line">
             グループへ
           </Link>
         </div>
@@ -113,15 +115,10 @@ export default function InvitePage() {
       {preview?.valid && !preview.alreadyMember && (
         <div className="flex flex-col items-center gap-3">
           <p>
-            「<span className="font-medium">{preview.groupName}</span>」に招待されています。
+            「<span className="font-bold">{preview.groupName}</span>」に招待されています。
           </p>
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleJoin}
-            className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
-          >
+          {error && <p className="note-danger">{error}</p>}
+          <button type="button" disabled={busy} onClick={handleJoin} className="btn btn-fill">
             参加する
           </button>
         </div>

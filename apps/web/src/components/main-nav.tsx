@@ -53,22 +53,41 @@ export function MainNav({ groups, selectedGroupId, activeTab, loading = false }:
     }
   }
 
+  // 下線タブ（エディトリアル・シャープ, Issue #38）。アクティブは太い墨色の下線 + 強い字、
+  // 非アクティブは透明下線で高さを揃え、ホバーで文字色だけ立てる。
   const tabClass = (active: boolean) =>
-    `rounded-md border px-4 py-2 ${active ? "bg-black text-white dark:bg-white dark:text-black" : ""}`;
+    `-mb-px border-b-3 px-1 pb-2 text-sm tracking-wide transition-colors ${
+      active
+        ? "border-ink font-extrabold text-ink"
+        : "border-transparent font-bold text-muted hover:text-ink"
+    }`;
 
   // 表示名: 取得中や名前が引けない間（取得失敗時の items ページ等）は控えめなプレースホルダにし、
   // 「グループなし」は取得が完了して本当に所属 0 件のときだけ出す。
   const selectedName = groups.find((g) => g.id === selectedGroupId)?.name;
 
   return (
-    <header className="flex w-full max-w-md flex-col gap-3">
+    <header className="flex w-full flex-col gap-3">
+      {/* マストヘッド: ワードマークと設定（歯車）。太罫線でページ全体の基準線を引く。 */}
+      <div className="flex items-center justify-between border-b-2 border-ink pb-2">
+        <Link href="/" className="text-lg font-black uppercase tracking-[0.08em]">
+          Warikan
+        </Link>
+        <Link
+          href="/settings"
+          aria-label="設定"
+          className="shrink-0 p-1 text-muted transition-colors hover:text-ink"
+        >
+          {gearIcon}
+        </Link>
+      </div>
       <div className="flex items-center justify-between gap-3">
         {groups.length >= 2 ? (
           <select
             aria-label="グループを切替"
             value={selectedGroupId ?? ""}
             onChange={(e) => handleGroupChange(e.target.value)}
-            className="min-w-0 flex-1 rounded-md border px-3 py-2"
+            className="field min-w-0 flex-1 py-1.5 text-sm font-bold"
           >
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -77,15 +96,12 @@ export function MainNav({ groups, selectedGroupId, activeTab, loading = false }:
             ))}
           </select>
         ) : (
-          <span className="truncate text-lg font-medium">
+          <span className="truncate text-base font-extrabold">
             {selectedName ?? (loading || selectedGroupId ? "…" : "グループなし")}
           </span>
         )}
-        <Link href="/settings" aria-label="設定" className="shrink-0 rounded-md border p-2">
-          {gearIcon}
-        </Link>
       </div>
-      <nav aria-label="メインナビゲーション" className="flex gap-2">
+      <nav aria-label="メインナビゲーション" className="flex gap-5 border-b border-rule">
         <Link href="/" className={tabClass(activeTab === "entry")}>
           入力
         </Link>
@@ -107,10 +123,16 @@ export function MainNav({ groups, selectedGroupId, activeTab, loading = false }:
         ) : (
           // グループ未所属のときは一覧を開けないため、タブを不活性表示にする。
           <>
-            <span aria-disabled="true" className="rounded-md border px-4 py-2 text-zinc-400">
+            <span
+              aria-disabled="true"
+              className="-mb-px border-b-3 border-transparent px-1 pb-2 text-sm font-bold tracking-wide text-muted/50"
+            >
               未精算
             </span>
-            <span aria-disabled="true" className="rounded-md border px-4 py-2 text-zinc-400">
+            <span
+              aria-disabled="true"
+              className="-mb-px border-b-3 border-transparent px-1 pb-2 text-sm font-bold tracking-wide text-muted/50"
+            >
               精算済
             </span>
           </>

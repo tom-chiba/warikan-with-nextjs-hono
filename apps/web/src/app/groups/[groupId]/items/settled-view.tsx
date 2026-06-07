@@ -59,7 +59,7 @@ export function SettledView({ groupId }: { groupId: string }) {
   return (
     <>
       {(error || fetchError) && (
-        <p className="w-full max-w-2xl text-sm text-red-500">
+        <p className="note-danger w-full">
           {error ??
             (fetchError instanceof Error
               ? fetchError.message
@@ -67,9 +67,9 @@ export function SettledView({ groupId }: { groupId: string }) {
         </p>
       )}
 
-      <section className="flex w-full max-w-2xl flex-col gap-3">
+      <section className="flex w-full flex-col gap-3">
         {items.length === 0 ? (
-          <p className="text-sm text-zinc-500">精算済のアイテムはありません。</p>
+          <p className="note-muted">精算済のアイテムはありません。</p>
         ) : (
           <ItemsTable
             items={items}
@@ -77,7 +77,7 @@ export function SettledView({ groupId }: { groupId: string }) {
               <>
                 <Link
                   href={`/groups/${groupId}/items/${item.id}/edit?from=settled`}
-                  className="rounded-md border px-3 py-1 text-xs"
+                  className="btn btn-line btn-sm"
                 >
                   編集
                 </Link>
@@ -85,7 +85,7 @@ export function SettledView({ groupId }: { groupId: string }) {
                   type="button"
                   disabled={busy}
                   onClick={() => handleUnsettle(item.id, item.name)}
-                  className="rounded-md border px-3 py-1 text-xs disabled:opacity-50"
+                  className="btn btn-line btn-sm"
                 >
                   未精算に戻す
                 </button>
@@ -93,7 +93,7 @@ export function SettledView({ groupId }: { groupId: string }) {
                   type="button"
                   disabled={busy}
                   onClick={() => deleteItem(item.id, item.name)}
-                  className="rounded-md border px-3 py-1 text-xs text-red-600 disabled:opacity-50"
+                  className="btn btn-line-danger btn-sm"
                 >
                   削除
                 </button>

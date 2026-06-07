@@ -89,11 +89,14 @@ export function EditItemInner() {
     : undefined;
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-8 p-8">
-      <h1 className="text-2xl font-semibold">購入品を編集</h1>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-6">
+      <div className="flex flex-col gap-1">
+        <span className="kicker">Edit Item</span>
+        <h1 className="headline">購入品を編集</h1>
+      </div>
 
       {fetchError && (
-        <p className="w-full max-w-md text-sm text-red-500">
+        <p className="note-danger w-full">
           {fetchError instanceof Error ? fetchError.message : "アイテムの取得に失敗しました"}
         </p>
       )}
@@ -102,10 +105,10 @@ export function EditItemInner() {
       {item && initial ? (
         <ItemForm members={members} initial={initial} submitLabel="更新" onSubmit={handleSubmit} />
       ) : (
-        !fetchError && <p className="text-sm text-zinc-500">読み込み中…</p>
+        !fetchError && <p className="note-muted">読み込み中…</p>
       )}
 
-      <Link href={listPath} className="rounded-md border px-4 py-2">
+      <Link href={listPath} className="link-quiet self-start">
         {from === "settled" ? "精算済一覧へ戻る" : "未精算一覧へ戻る"}
       </Link>
     </main>

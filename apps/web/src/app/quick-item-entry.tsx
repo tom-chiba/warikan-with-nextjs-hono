@@ -30,10 +30,13 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
   return (
     <section className="flex w-full max-w-md flex-col gap-4">
       {/* 一覧への導線は MainNav の「未精算 / 精算済」タブが担うため、ここには置かない（#51）。 */}
-      <h2 className="text-lg font-medium">{groupName} に購入品を入力</h2>
+      <div className="flex flex-col gap-1">
+        <span className="kicker">Quick Entry</span>
+        <h2 className="headline">{groupName} に購入品を入力</h2>
+      </div>
       {membersError ? (
         // members が空のままだと ItemForm が「読み込み中」を出し続けるため、失敗は明示する。
-        <p className="text-sm text-red-500">メンバー一覧の取得に失敗しました。</p>
+        <p className="note-danger">メンバー一覧の取得に失敗しました。</p>
       ) : (
         <ItemForm
           members={members}

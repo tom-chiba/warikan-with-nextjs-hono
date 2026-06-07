@@ -60,28 +60,29 @@ export default function GroupsPage() {
   const groups = groupsData?.groups ?? [];
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-8 p-8">
-      <h1 className="text-2xl font-semibold">グループ</h1>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-6">
+      <div className="flex flex-col gap-1">
+        <span className="kicker">Groups</span>
+        <h1 className="headline">グループ</h1>
+      </div>
 
-      <section className="flex w-full max-w-xs flex-col gap-3">
-        <h2 className="text-lg font-medium">所属グループ</h2>
-        {groupsLoading && <p className="text-zinc-500">読み込み中…</p>}
-        {groupsError && <p className="text-sm text-red-500">グループ一覧の取得に失敗しました。</p>}
+      <section className="flex w-full flex-col gap-3">
+        <h2 className="section-title section-rule">所属グループ</h2>
+        {groupsLoading && <p className="note-muted">読み込み中…</p>}
+        {groupsError && <p className="note-danger">グループ一覧の取得に失敗しました。</p>}
         {!groupsLoading && !groupsError && groups.length === 0 && (
-          <p className="text-sm text-zinc-500">
-            まだグループがありません。下のフォームから作成しましょう。
-          </p>
+          <p className="note-muted">まだグループがありません。下のフォームから作成しましょう。</p>
         )}
         {groups.length > 0 && (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {groups.map((g) => (
               <li key={g.id}>
                 <Link
                   href={`/groups/${g.id}`}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                  className="flex items-center justify-between border-b border-rule px-1 py-3 transition-colors hover:bg-ink/5"
                 >
-                  <span>{g.name}</span>
-                  <span className="text-xs text-zinc-500">
+                  <span className="font-bold">{g.name}</span>
+                  <span className="text-xs font-bold tracking-widest text-muted">
                     {g.role === "owner" ? "オーナー" : "メンバー"}
                   </span>
                 </Link>
@@ -91,11 +92,8 @@ export default function GroupsPage() {
         )}
       </section>
 
-      <form
-        onSubmit={handleCreate}
-        className="flex w-full max-w-xs flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800"
-      >
-        <h2 className="text-lg font-medium">グループを作成</h2>
+      <form onSubmit={handleCreate} className="flex w-full flex-col gap-3">
+        <h2 className="section-title section-rule">グループを作成</h2>
         <input
           type="text"
           aria-label="グループ名"
@@ -103,24 +101,24 @@ export default function GroupsPage() {
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="rounded-md border px-3 py-2"
+          className="field"
         />
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="note-danger">{error}</p>}
         <button
           type="submit"
           disabled={submitting || name.trim().length === 0}
-          className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          className="btn btn-fill"
         >
           作成
         </button>
       </form>
 
       {/* グループ管理は設定ハブ（/settings）配下の動線（#51）。 */}
-      <div className="flex gap-2">
-        <Link href="/settings" className="rounded-md border px-4 py-2">
+      <div className="flex gap-5">
+        <Link href="/settings" className="link-quiet">
           設定へ戻る
         </Link>
-        <Link href="/" className="rounded-md border px-4 py-2">
+        <Link href="/" className="link-quiet">
           ホームへ
         </Link>
       </div>

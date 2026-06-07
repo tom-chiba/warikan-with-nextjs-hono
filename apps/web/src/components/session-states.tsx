@@ -6,7 +6,7 @@ import Link from "next/link";
 export function SessionPending() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <p className="text-zinc-500">セッション確認中…</p>
+      <p className="note-muted">セッション確認中…</p>
     </main>
   );
 }
@@ -15,8 +15,8 @@ export function SessionPending() {
 export function SessionError({ onRetry }: { onRetry: () => void }) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-      <p className="text-red-500">セッションの確認に失敗しました。</p>
-      <button type="button" onClick={onRetry} className="rounded-md border px-4 py-2">
+      <p className="note-danger">セッションの確認に失敗しました。</p>
+      <button type="button" onClick={onRetry} className="btn btn-line">
         再試行
       </button>
     </main>
@@ -32,7 +32,7 @@ export function SignInPrompt({
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
       <p>{message}</p>
-      <Link href="/" className="rounded-md border px-4 py-2">
+      <Link href="/" className="btn btn-line">
         サインインへ
       </Link>
     </main>

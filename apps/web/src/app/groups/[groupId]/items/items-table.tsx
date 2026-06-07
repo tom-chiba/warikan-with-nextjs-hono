@@ -33,10 +33,12 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
   // 一部選択（indeterminate 表示）の判定。selected に一覧外の id が残っていても
   // 影響を受けないよう、表示中の items を基準に導出する。
   const someSelected = !!selectable && items.some((i) => selectable.selected.has(i.id));
+  // 見出し行は太罫線・小さめの強い字、本文行は細罫線で帳簿らしく組む（Issue #38）。
+  const headClass = "py-2 text-xs font-bold tracking-widest text-muted";
   return (
     <table className="w-full border-collapse text-sm">
       <thead>
-        <tr className="border-b text-left text-zinc-500">
+        <tr className="border-b-2 border-ink text-left">
           {selectable && (
             <th className="w-8 py-2">
               <IndeterminateCheckbox
@@ -47,29 +49,34 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
               />
             </th>
           )}
-          <th className="py-2">購入品名</th>
-          <th className="py-2">購入日</th>
-          <th className="py-2 text-right">合計金額</th>
-          <th className="py-2 text-right">操作</th>
+          <th className={headClass}>購入品名</th>
+          <th className={headClass}>購入日</th>
+          <th className={`${headClass} text-right`}>合計金額</th>
+          <th className={`${headClass} text-right`}>操作</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => (
-          <tr key={item.id} className="border-b">
+          <tr key={item.id} className="border-b border-rule">
             {selectable && (
-              <td className="py-2">
+              <td className="py-2.5">
                 <input
                   type="checkbox"
+                  className="accent-accent"
                   aria-label={`${item.name} を選択`}
                   checked={selectable.selected.has(item.id)}
                   onChange={() => selectable.onToggle(item.id)}
                 />
               </td>
             )}
-            <td className="py-2">{item.name}</td>
-            <td className="py-2">{item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}</td>
-            <td className="py-2 text-right">{item.total} 円</td>
-            <td className="py-2 text-right">
+            <td className="py-2.5 font-medium">{item.name}</td>
+            <td className="py-2.5 tabular-nums text-muted">
+              {item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}
+            </td>
+            <td className="py-2.5 text-right font-bold tabular-nums">
+              {item.total.toLocaleString()} 円
+            </td>
+            <td className="py-2.5 text-right">
               <span className="flex justify-end gap-2">{renderActions(item)}</span>
             </td>
           </tr>

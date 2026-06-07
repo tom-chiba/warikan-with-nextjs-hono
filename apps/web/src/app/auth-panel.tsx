@@ -36,7 +36,7 @@ export function AuthPanel() {
         placeholder="名前"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="rounded-md border px-3 py-2"
+        className="field"
       />
       <input
         type="email"
@@ -45,7 +45,7 @@ export function AuthPanel() {
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="rounded-md border px-3 py-2"
+        className="field"
       />
       <input
         type="password"
@@ -54,22 +54,18 @@ export function AuthPanel() {
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="rounded-md border px-3 py-2"
+        className="field"
       />
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="note-danger">{error}</p>}
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
-        >
+        <button type="submit" disabled={submitting} className="btn btn-fill flex-1">
           サインアップ
         </button>
         <button
           type="button"
           disabled={submitting}
           onClick={handleSignIn}
-          className="rounded-md border px-4 py-2 disabled:opacity-50"
+          className="btn btn-line flex-1"
         >
           サインイン
         </button>

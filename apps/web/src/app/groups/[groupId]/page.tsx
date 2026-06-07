@@ -139,43 +139,42 @@ export default function GroupPage() {
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center gap-8 p-8">
-      <h1 className="text-2xl font-semibold">グループ</h1>
-      <p className="text-sm text-zinc-500">
-        グループ ID: <span className="font-mono">{groupId}</span>
-      </p>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-8 px-5 py-6">
+      <div className="flex flex-col gap-1">
+        <span className="kicker">Group</span>
+        <h1 className="headline">グループ</h1>
+        <p className="note-muted">
+          グループ ID: <span className="font-mono text-xs">{groupId}</span>
+        </p>
+      </div>
 
       {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
       {(error || fetchError) && (
-        <p className="w-full max-w-md text-sm text-red-500">
+        <p className="note-danger w-full">
           {error ??
             (fetchError instanceof Error ? fetchError.message : "招待リンクの取得に失敗しました")}
         </p>
       )}
 
-      <section className="flex w-full max-w-md flex-col gap-3">
-        <h2 className="text-lg font-medium">招待リンク</h2>
+      <section className="flex w-full flex-col gap-3">
+        <h2 className="section-title section-rule">招待リンク</h2>
         {inviteUrl ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-zinc-500">
+            <p className="note-muted">
               このリンクを共有するとメンバーを招待できます（有効期限あり）。
             </p>
-            <code className="break-all rounded-md border bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-900">
+            <code className="break-all border border-rule bg-ink/5 px-3 py-2 font-mono text-xs">
               {inviteUrl}
             </code>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => handleCopy(inviteUrl)}
-                className="rounded-md border px-4 py-2"
-              >
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => handleCopy(inviteUrl)} className="btn btn-line">
                 {copied ? "コピーしました" : "コピー"}
               </button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => invitation && handleRevoke(invitation.token)}
-                className="rounded-md border px-4 py-2 text-red-600 disabled:opacity-50"
+                className="btn btn-line-danger"
               >
                 無効化
               </button>
@@ -183,47 +182,44 @@ export default function GroupPage() {
                 type="button"
                 disabled={busy}
                 onClick={handleGenerate}
-                className="rounded-md border px-4 py-2 disabled:opacity-50"
+                className="btn btn-line"
               >
                 再発行
               </button>
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleGenerate}
-            className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
-          >
+          <button type="button" disabled={busy} onClick={handleGenerate} className="btn btn-fill">
             招待リンクを発行
           </button>
         )}
       </section>
 
-      <section className="flex w-full max-w-md flex-col gap-3">
-        <h2 className="text-lg font-medium">メンバー</h2>
+      <section className="flex w-full flex-col gap-3">
+        <h2 className="section-title section-rule">メンバー</h2>
         {members.length === 0 ? (
-          <p className="text-sm text-zinc-500">読み込み中…</p>
+          <p className="note-muted">読み込み中…</p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col">
             {members.map((m) => {
               const isSelf = m.userId === currentUserId;
               const canRemove = isSelf || isOwner;
               return (
                 <li
                   key={m.userId}
-                  className="flex items-center justify-between rounded-md border px-3 py-2"
+                  className="flex items-center justify-between border-b border-rule px-1 py-3"
                 >
                   <span className="flex flex-col">
-                    <span>
+                    <span className="font-bold">
                       {m.name}
-                      {isSelf && <span className="text-xs text-zinc-500">（あなた）</span>}
+                      {isSelf && (
+                        <span className="ml-1 text-xs font-medium text-muted">（あなた）</span>
+                      )}
                     </span>
-                    <span className="text-xs text-zinc-500">{m.email}</span>
+                    <span className="text-xs text-muted">{m.email}</span>
                   </span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-xs text-zinc-500">
+                  <span className="flex items-center gap-3">
+                    <span className="text-xs font-bold tracking-widest text-muted">
                       {m.role === "owner" ? "オーナー" : "メンバー"}
                     </span>
                     {canRemove && (
@@ -231,7 +227,7 @@ export default function GroupPage() {
                         type="button"
                         disabled={busy}
                         onClick={() => handleRemove(m.userId, isSelf, m.name)}
-                        className="rounded-md border px-3 py-1 text-sm text-red-600 disabled:opacity-50"
+                        className="btn btn-line-danger btn-sm"
                       >
                         {isSelf ? "退出" : "削除"}
                       </button>
@@ -246,11 +242,11 @@ export default function GroupPage() {
 
       {/* 入力・一覧の常設ナビはメインページが担うが、設定動線からこのグループの明細へ
           直接移れるよう一覧へのショートカットだけ残す（開くとカレントグループも切り替わる）。 */}
-      <div className="flex gap-2">
-        <Link href={`/groups/${groupId}/items`} className="rounded-md border px-4 py-2">
+      <div className="flex gap-5">
+        <Link href={`/groups/${groupId}/items`} className="link-quiet">
           購入品一覧
         </Link>
-        <Link href="/groups" className="rounded-md border px-4 py-2">
+        <Link href="/groups" className="link-quiet">
           グループ一覧へ
         </Link>
       </div>

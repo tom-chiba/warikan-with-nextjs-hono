@@ -130,7 +130,7 @@ test("未精算アイテムが品名・購入日・合計金額付きで一覧�
 
   expect(await screen.findByText("ランチ")).toBeInTheDocument();
   expect(screen.getByText("2026-06-01")).toBeInTheDocument();
-  expect(screen.getByText("1000 円")).toBeInTheDocument();
+  expect(screen.getByText("1,000 円")).toBeInTheDocument();
 });
 
 test("0 件のときは空表示になる", async () => {
@@ -256,8 +256,9 @@ test("全て選択チェックボックスで全アイテムが選択される",
   expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
   expect(screen.getByLabelText("ディナー を選択")).toBeChecked();
   expect(selectAll).toBeChecked();
-  // 全 2 件が送金計算の対象になっている。
-  expect(screen.getByText("送金リスト（選択 2 件）")).toBeInTheDocument();
+  // 全 2 件が送金計算の対象になっている（見出しと選択件数は別要素で表示される）。
+  expect(screen.getByText("送金リスト")).toBeInTheDocument();
+  expect(screen.getByText("選択 2 件")).toBeInTheDocument();
 });
 
 test("全件選択済みで全て選択チェックボックスを押すと全件解除される", async () => {
@@ -320,7 +321,7 @@ test("精算済ビューではアイテムが表示され、選択チェック�
   renderSettledView();
 
   expect(await screen.findByText("ランチ")).toBeInTheDocument();
-  expect(screen.getByText("1000 円")).toBeInTheDocument();
+  expect(screen.getByText("1,000 円")).toBeInTheDocument();
   // 精算対象の選択は未精算ビュー専用（全選択ヘッダー含む）。
   expect(screen.queryByLabelText("ランチ を選択")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("全て選択")).not.toBeInTheDocument();
