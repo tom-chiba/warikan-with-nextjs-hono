@@ -1,8 +1,11 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { renderWithClient } from "@/test/render-with-client";
 
 // auth-client と next/navigation をモックする。vi.hoisted で巻き上げ順の問題を回避する。
+// changeEmail / changePassword の送信はコンポーネントテスト側で検証するため、
+// ここではモックしない（ページテストはボタン表示の確認までしか行わない）。
 const { useSessionMock, deleteUserMock, signOutMock, pushMock, confirmMock } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
   deleteUserMock: vi.fn(),
@@ -49,7 +52,7 @@ async function submitDelete(password = "password1234") {
 test("セッション確認中はローディングを表示する", () => {
   useSessionMock.mockReturnValue({ data: null, isPending: true });
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
 
   expect(screen.getByText("セッション確認中…")).toBeInTheDocument();
 });
@@ -57,7 +60,7 @@ test("セッション確認中はローディングを表示する", () => {
 test("未ログイン時はサインインへの導線を表示する", () => {
   useSessionMock.mockReturnValue({ data: null, isPending: false });
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
 
   expect(screen.getByText("設定を利用するにはサインインが必要です。")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "サインインへ" })).toBeInTheDocument();
@@ -66,16 +69,27 @@ test("未ログイン時はサインインへの導線を表示する", () => {
 test("ログイン中は名前とメールアドレスを表示する", () => {
   useSessionMock.mockReturnValue(loggedIn);
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
 
   expect(screen.getByText("テストユーザー")).toBeInTheDocument();
   expect(screen.getByText("me@example.com")).toBeInTheDocument();
 });
 
+// フォームの開閉・送信の詳細は email-change-form.test.tsx / password-change-form.test.tsx で
+// 検証するため、ページでは変更フォームへの導線（変更ボタン）が出ていることだけ確認する。
+test("メールアドレスとパスワードの変更ボタンを表示する", () => {
+  useSessionMock.mockReturnValue(loggedIn);
+
+  renderWithClient(<SettingsPage />);
+
+  expect(screen.getByRole("button", { name: "メールアドレスを変更" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "パスワードを変更" })).toBeInTheDocument();
+});
+
 test("設定ハブとしてグループ管理とホームへの導線を表示する", () => {
   useSessionMock.mockReturnValue(loggedIn);
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
 
   expect(screen.getByRole("link", { name: "グループ管理へ" })).toHaveAttribute("href", "/groups");
   expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/");
@@ -85,7 +99,7 @@ test("サインアウトするとホームへ遷移する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   signOutMock.mockResolvedValue(undefined);
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
   await userEvent.click(screen.getByRole("button", { name: "サインアウト" }));
 
   expect(signOutMock).toHaveBeenCalled();
@@ -95,7 +109,7 @@ test("サインアウトするとホームへ遷移する", async () => {
 test("パスワード未入力では削除ボタンが無効になる", () => {
   useSessionMock.mockReturnValue(loggedIn);
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
 
   expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeDisabled();
 });
@@ -104,7 +118,7 @@ test("confirm でキャンセルすると deleteUser を呼ばない", async () 
   useSessionMock.mockReturnValue(loggedIn);
   confirmMock.mockReturnValue(false);
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
   await submitDelete();
 
   expect(confirmMock).toHaveBeenCalled();
@@ -115,7 +129,7 @@ test("削除に成功するとホームへ遷移する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   deleteUserMock.mockResolvedValue({ error: null });
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
   await submitDelete();
 
   expect(deleteUserMock).toHaveBeenCalledWith({ password: "password1234" });
@@ -129,7 +143,7 @@ test("誤パスワードでは日本語のエラーメッセージを表示し�
     error: { code: "INVALID_PASSWORD", message: "Invalid password" },
   });
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
   await submitDelete("wrong-password");
 
   await waitFor(() => expect(screen.getByText("パスワードが正しくありません")).toBeInTheDocument());
@@ -142,7 +156,7 @@ test("code の無いエラーは message をそのまま表示する（自前フ
   useSessionMock.mockReturnValue(loggedIn);
   deleteUserMock.mockResolvedValue({ error: { message: "パスワードを入力してください" } });
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
   await submitDelete();
 
   await waitFor(() => expect(screen.getByText("パスワードを入力してください")).toBeInTheDocument());
@@ -153,7 +167,7 @@ test("ネットワークエラー時もエラーメッセージを表示しボ�
   useSessionMock.mockReturnValue(loggedIn);
   deleteUserMock.mockRejectedValue(new TypeError("Failed to fetch"));
 
-  render(<SettingsPage />);
+  renderWithClient(<SettingsPage />);
   await submitDelete();
 
   await waitFor(() =>

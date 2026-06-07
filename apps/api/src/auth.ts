@@ -1,10 +1,10 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { eq, notExists } from "drizzle-orm";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
-import { group, groupMember } from "./db/schema";
+import { group, groupMember, user } from "./db/schema";
 import { testPasswordHasher } from "./internal/test-password-hasher";
 
 // D1 バインディングや secret は実行時 env から渡るため、
@@ -48,9 +48,54 @@ export function createAuth(env: Env) {
             throw new APIError("BAD_REQUEST", { message: "名前を入力してください" });
           }
         }
+        // Better Auth の /change-email は新メールが既存ユーザーと重複していても、
+        // メールアドレス列挙対策として黙って成功（{ status: true }）を返し、変更されない。
+        // それでは UI でエラーを示せないため、ここで重複を 400 として明示する（#61）。
+        // サインアップが既に USER_ALREADY_EXISTS で存在有無を返すため、認証済みユーザーに
+        // とっては新たな情報漏えいにはならない。
+        if (ctx.path === "/change-email" && typeof ctx.body?.newEmail === "string") {
+          // hooks.before はエンドポイント本体の認証チェックより先に走るため、無条件に
+          // 重複を 400 で返すと、未認証でもステータス差（400/401）でメールの存在有無が
+          // 判別できてしまう。セッションが無ければ何もせず、本体の 401 に委ねる。
+          // disableCookieCache: ここで解決したセッションは ctx.context.session にメモ化され、
+          // 本体の sensitiveSessionMiddleware（DB 再検証）がそれを再利用する。将来
+          // session.cookieCache を有効化しても失効済みセッションが素通りしないよう、
+          // メモ化される値を最初から DB 検証済みにしておく。
+          const session = await getSessionFromCtx(ctx, { disableCookieCache: true });
+          if (!session) {
+            return;
+          }
+          // Better Auth 本体に合わせて小文字に正規化して比較する。
+          const newEmail = ctx.body.newEmail.toLowerCase();
+          // 現在のメールと同じ値は「重複」ではなく「変更なし」。ここで重複扱いにすると
+          // 紛らわしいため、Better Auth 本体の "Email is the same"（400）に委ねる。
+          if (newEmail === session.user.email) {
+            return;
+          }
+          const existing = await db
+            .select({ id: user.id })
+            .from(user)
+            .where(eq(user.email, newEmail))
+            .limit(1);
+          if (existing.length > 0) {
+            throw new APIError("BAD_REQUEST", {
+              message: "このメールアドレスはすでに使用されています",
+            });
+          }
+        }
       }),
     },
     user: {
+      // メールアドレス変更（#61）。メール送信基盤が未整備のため確認メール方式は採れず、
+      // updateEmailWithoutVerification で即時変更する。これは現メールが未検証
+      //（emailVerified !== true）の場合のみ働くが、本アプリはメール検証自体が無く
+      // 全ユーザーが未検証のため、実質すべてのユーザーが即時変更となる。
+      // 将来メール検証を導入する際は emailVerification.sendVerificationEmail の実装と
+      // このオプションの見直しが必要（#61 の実装方針メモ参照）。
+      changeEmail: {
+        enabled: true,
+        updateEmailWithoutVerification: true,
+      },
       // アカウント削除（退会）。パスワード再入力（authClient.deleteUser({ password })）で
       // 本人確認して即削除する。メール送信基盤が未整備のため確認リンク方式は採らない（#33）。
       deleteUser: {

@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { authClient, signOut, useSession } from "@/lib/auth-client";
+import { EmailChangeForm } from "./email-change-form";
+import { PasswordChangeForm } from "./password-change-form";
 
 // 設定ハブページ。日常動線から外したグループ管理への入り口と、アカウント情報・
 // サインアウト・危険操作ゾーン（アカウント削除）をここに集約する（#51）。
+// メールアドレス・パスワードの変更フォームは各コンポーネントに閉じている（#61）。
 // 削除は Better Auth の deleteUser（パスワード再入力方式）で行い、本人確認を伴う（#33）。
 export default function SettingsPage() {
   const { data: session, isPending } = useSession();
@@ -79,9 +82,8 @@ export default function SettingsPage() {
         <p className="text-sm">
           名前: <span className="font-bold">{session.user.name}</span>
         </p>
-        <p className="text-sm">
-          メール: <span className="font-mono text-xs">{session.user.email}</span>
-        </p>
+        <EmailChangeForm currentEmail={session.user.email} />
+        <PasswordChangeForm />
         <button type="button" onClick={handleSignOut} className="link-quiet mt-1 self-start">
           サインアウト
         </button>
