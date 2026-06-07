@@ -26,4 +26,5 @@ trustPolicyExclude:
   # semver: @babel/core の推移依存。6.3.1 は npm CLI チームによる 6.x 系へのセキュリティ
   # バックポート（CVE-2022-25883 修正、公開者 lukekarrys を確認済み）。provenance 付きの
   # 7.5.x より後に公開されたため no-downgrade が降格扱いする誤検知のため除外。
-  - semver
+  # 除外は監査済みの 6.3.1 のみに限定し、将来の別バージョンには no-downgrade を効かせ続ける。
+  - semver@6.3.1
