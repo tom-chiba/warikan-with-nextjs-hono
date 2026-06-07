@@ -1,10 +1,11 @@
 import { zValidator } from "@hono/zod-validator";
-import { computeSettlements, type Transfer } from "@warikan/domain";
+import { computeSettlements } from "@warikan/domain";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { DbVariables, GroupMemberVariables } from "../context";
 import { groupMember, item, itemPayment, itemShare } from "../db/schema";
+import { groupByItem, makeRows, sumAmount, transfersEqual, validateAmounts } from "../lib/items";
 
 // メンバーごとの金額入力（支払額・割勘金額の各行）。amount は正の整数（円）。
 // 0 円（支払い／負担なし）の行はそもそも送らない仕様のため positive で弾く。
@@ -31,25 +32,6 @@ const transferEntry = z.object({
   amount: z.number().int().positive(),
 });
 
-const sumAmount = (entries: { amount: number }[]) => entries.reduce((acc, e) => acc + e.amount, 0);
-
-const hasDuplicateUser = (entries: { userId: string }[]) =>
-  new Set(entries.map((e) => e.userId)).size !== entries.length;
-
-// 割勘の整合性チェック（支払額合計 = 割勘金額合計・合計 > 0・同一メンバー重複なし）。
-// 問題があればエラーメッセージ、なければ null を返す。POST/PUT で共通。
-function validateAmounts(payments: { userId: string; amount: number }[], shares: typeof payments) {
-  const paymentTotal = sumAmount(payments);
-  const shareTotal = sumAmount(shares);
-  if (paymentTotal === 0 || paymentTotal !== shareTotal) {
-    return "支払額合計と割勘金額合計が一致していません";
-  }
-  if (hasDuplicateUser(payments) || hasDuplicateUser(shares)) {
-    return "同一メンバーが重複しています";
-  }
-  return null;
-}
-
 // 当該グループの全メンバー userId 集合を返す（payments/shares の userId 検証用）。
 async function groupMemberIds(
   db: (GroupMemberVariables & DbVariables)["db"],
@@ -61,34 +43,6 @@ async function groupMemberIds(
     .where(eq(groupMember.groupId, groupId));
   return new Set(rows.map((m) => m.userId));
 }
-
-// クライアントが確認した送金リストとサーバー側の再計算結果の完全一致を判定する。
-// computeSettlements() は入力順序に依存せず決定的（同額時は userId 順で安定）なため、
-// 同じデータからは必ず同じ配列が得られ、順序込みの単純比較で検証できる（ADR-0013）。
-function transfersEqual(a: Transfer[], b: Transfer[]) {
-  return (
-    a.length === b.length &&
-    a.every((t, i) => t.from === b[i].from && t.to === b[i].to && t.amount === b[i].amount)
-  );
-}
-
-// itemId をキーに金額行をまとめる（一覧で item ごとの payments/shares を組み立てる用）。
-function groupByItem<T extends { itemId: string; userId: string; amount: number }>(rows: T[]) {
-  const map = new Map<string, { userId: string; amount: number }[]>();
-  for (const { itemId, userId, amount } of rows) {
-    const list = map.get(itemId);
-    if (list) {
-      list.push({ userId, amount });
-    } else {
-      map.set(itemId, [{ userId, amount }]);
-    }
-  }
-  return map;
-}
-
-// 金額行（payments / shares）を子テーブル挿入用の行（itemId 付き）へ変換する。保存(POST)・更新(PUT)で共通。
-const makeRows = (itemId: string, entries: { userId: string; amount: number }[]) =>
-  entries.map((e) => ({ itemId, ...e }));
 
 // /groups/:groupId 配下の保護ルート（当該グループのメンバー限定）。
 // 認可ミドルウェア（requireAuth / provideDb / requireGroupMember）は index.ts 側でマウントするため、
