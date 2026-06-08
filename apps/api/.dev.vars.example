@@ -3,3 +3,9 @@ BETTER_AUTH_URL=http://localhost:8787
 # 許可するフロントエンドのオリジン（CORS / trustedOrigins）。
 # wrangler.jsonc の vars に本番 URL を置くため、ローカルでは必ず localhost で上書きする。
 WEB_ORIGIN=http://localhost:3000
+# メール送信（#70）。
+# RESEND_API_KEY を空のままにすると実送信せず console 出力にフォールバックする。
+# 実際に送信を試したい場合のみ Resend の API キーを設定する。
+RESEND_API_KEY=
+# EMAIL_TEST_INBOX=1 で /__test__/* の受信箱エンドポイントを有効化する（e2e の検証リンク取り出し用）。
+EMAIL_TEST_INBOX=1

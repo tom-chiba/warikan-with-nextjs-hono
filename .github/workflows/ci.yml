@@ -41,7 +41,7 @@ jobs:
 
       # wrangler.jsonc の vars には本番 URL が入るため、E2E(localhost) 用に .dev.vars で上書きする。
       - run: |
-          printf 'BETTER_AUTH_SECRET=ci-e2e-secret-value-at-least-32-bytes\nBETTER_AUTH_URL=http://localhost:8787\nWEB_ORIGIN=http://localhost:3000\n' > apps/api/.dev.vars
+          printf 'BETTER_AUTH_SECRET=ci-e2e-secret-value-at-least-32-bytes\nBETTER_AUTH_URL=http://localhost:8787\nWEB_ORIGIN=http://localhost:3000\nEMAIL_TEST_INBOX=1\n' > apps/api/.dev.vars
 
       # ローカル D1 にマイグレーションを適用（DB 依存の E2E に備える）。
       - run: pnpm --filter @warikan/api db:migrate:local

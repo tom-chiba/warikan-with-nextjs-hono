@@ -40,6 +40,9 @@ export default defineConfig(async () => {
                   // (#42 / ADR-0012)。auth.ts は "1" との厳密比較で有効化を判定する。
                   // 本番には存在しないキー。
                   TEST_HASH: "1",
+                  // 送信内容をインメモリ受信箱に記録し /__test__/* を有効化する(#70)。
+                  // RESEND_API_KEY は注入しないため、テストでは実送信せず console + 受信箱記録になる。
+                  EMAIL_TEST_INBOX: "1",
                 },
               },
             }),
