@@ -1,4 +1,4 @@
-import type { EmailMessage } from "./index";
+import type { MailMessage } from "./index";
 
 // Resend の HTTP API を直接叩く薄いラッパ。SDK を依存に加えず fetch のみで実装する
 // （Workers のバンドルを軽く保ち、サービス固有型をこのファイルに閉じ込めるため）。
@@ -10,7 +10,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 export async function sendViaResend(
   apiKey: string,
   from: string,
-  message: EmailMessage,
+  message: MailMessage,
 ): Promise<void> {
   const res = await fetch(RESEND_ENDPOINT, {
     method: "POST",

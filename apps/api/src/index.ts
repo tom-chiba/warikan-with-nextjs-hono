@@ -27,7 +27,9 @@ app.use("*", (c, next) =>
 app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw));
 
 // メール送信の動作確認・テスト用ルート（#70）。EMAIL_TEST_INBOX === "1" のときだけ有効化する。
-// 本番 wrangler.jsonc にこのフラグは無いため、本番では未マウント（404）。
+// 本番 wrangler.jsonc にこのフラグは無いため、本番では GET/POST/DELETE とも 404 になる。
+// （上の CORS は OPTIONS を 204 で先取りするため、OPTIONS だけはこのガードに到達しない。
+// ただしこれは全パス共通の挙動で、本文も機密も返さずエンドポイント存在の判別材料にもならない。）
 // "1" との厳密比較は TEST_HASH と同様、"0"/"false" の誤設定で有効化されないようにするため。
 app.use("/__test__/*", async (c, next) => {
   if (c.env.EMAIL_TEST_INBOX !== "1") {

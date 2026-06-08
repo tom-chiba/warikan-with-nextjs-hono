@@ -1,4 +1,4 @@
-import type { EmailMessage } from "./index";
+import type { MailMessage } from "./index";
 
 // テスト用のインメモリ受信箱。EMAIL_TEST_INBOX === "1" のときだけ createEmailSender が
 // ここに送信内容を記録し、/__test__/emails 経由で取り出せるようにする（本番では未使用）。
@@ -8,7 +8,7 @@ import type { EmailMessage } from "./index";
 // wrangler dev / Miniflare は同一プロセス内で 1 つの worker インスタンスを使い回すため、
 // この store は同一プロセス内の後続リクエストから参照できる。
 
-export type SentEmail = EmailMessage & { from: string };
+export type SentEmail = MailMessage & { from: string };
 
 // 送信順に蓄積する。クリアは /__test__/emails の DELETE か clearSentEmails() で行う。
 const sentEmails: SentEmail[] = [];
