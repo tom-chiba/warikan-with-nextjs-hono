@@ -36,6 +36,40 @@ GitHub 連携が main へのマージで自動デプロイする。
 5. カスタムドメイン `warikan.api.tom-chiba.com` を Workers に割り当てる
    （Cloudflare ダッシュボード → Workers → Custom Domains）。
 
+### メール送信（Resend / #70・ADR-0015）
+
+トランザクションメール（パスワード再設定 #68・メール検証 #69 の前提）を Resend で送る。
+`RESEND_API_KEY` が未設定の環境（ローカル・テスト）では実送信せず console 出力にフォールバックする。
+
+1. Resend にドメイン `warikan.tom-chiba.com` を追加（Resend ダッシュボード → Domains → Add Domain）。
+2. 提示された DNS レコード（SPF の TXT・DKIM・任意で MX/DMARC）を **Cloudflare DNS** に登録し、
+   Resend 側で「Verified」になるまで待つ。
+   - 送信元 `RESEND_FROM`（`no-reply@warikan.tom-chiba.com`）は `apps/api/wrangler.jsonc` の `vars`
+     に置く（非機密）。別アドレスにする場合はここを変更する。
+3. API キーを発行（Resend → API Keys）し、機密として登録（git に入れない）:
+   ```
+   pnpm --filter @warikan/api exec wrangler secret put RESEND_API_KEY
+   ```
+
+#### 本番からの実送信を一度だけ検証する
+
+`/__test__/*` は `EMAIL_TEST_INBOX=1` のときだけ有効化される（本番 `wrangler.jsonc` には置かないため通常は 404）。
+実送信を検証したいときだけ一時的に有効化し、確認後に閉じる:
+
+```
+# 一時的にフラグを立てる（値は 1）
+pnpm --filter @warikan/api exec wrangler secret put EMAIL_TEST_INBOX
+# デプロイ済みの api に実送信させる（自分のメールアドレス宛）
+curl -X POST https://warikan.api.tom-chiba.com/__test__/send \
+  -H 'Content-Type: application/json' \
+  -d '{"to":"you@example.com"}'
+# 受信を確認したらフラグを削除してエンドポイントを閉じる
+pnpm --filter @warikan/api exec wrangler secret delete EMAIL_TEST_INBOX
+```
+
+> 注意: `EMAIL_TEST_INBOX` を本番に立てている間は `/__test__/send`（任意宛先への送信）と
+> `/__test__/emails`（送信履歴の閲覧）が露出する。検証が終わったら必ず削除すること。
+
 ### web（Vercel）
 
 1. Vercel で新規プロジェクトを作成し、本リポジトリを連携。
@@ -74,12 +108,15 @@ GitHub 連携が main へのマージで自動デプロイする。
 
 ## 環境変数まとめ
 
-| 変数                  | 用途                   | ローカル                      | 本番                  |
-| --------------------- | ---------------------- | ----------------------------- | --------------------- |
-| `BETTER_AUTH_SECRET`  | セッション署名（機密） | `apps/api/.dev.vars`          | `wrangler secret put` |
-| `BETTER_AUTH_URL`     | api 自身の公開 URL     | `.dev.vars`（localhost:8787） | wrangler.jsonc `vars` |
-| `WEB_ORIGIN`          | 許可する web オリジン  | 未設定（localhost:3000 既定） | wrangler.jsonc `vars` |
-| `NEXT_PUBLIC_API_URL` | web→api の宛先         | 未設定（localhost:8787 既定） | Vercel 環境変数       |
+| 変数                  | 用途                    | ローカル                       | 本番                         |
+| --------------------- | ----------------------- | ------------------------------ | ---------------------------- |
+| `BETTER_AUTH_SECRET`  | セッション署名（機密）  | `apps/api/.dev.vars`           | `wrangler secret put`        |
+| `BETTER_AUTH_URL`     | api 自身の公開 URL      | `.dev.vars`（localhost:8787）  | wrangler.jsonc `vars`        |
+| `WEB_ORIGIN`          | 許可する web オリジン   | 未設定（localhost:3000 既定）  | wrangler.jsonc `vars`        |
+| `RESEND_API_KEY`      | Resend API キー（機密） | `.dev.vars`（空=実送信しない） | `wrangler secret put`        |
+| `RESEND_FROM`         | メール送信元アドレス    | wrangler.jsonc `vars`          | wrangler.jsonc `vars`        |
+| `EMAIL_TEST_INBOX`    | `/__test__/*` 有効化    | `.dev.vars`（`1`）             | 未設定（検証時のみ一時設定） |
+| `NEXT_PUBLIC_API_URL` | web→api の宛先          | 未設定（localhost:8787 既定）  | Vercel 環境変数              |
 
 ## 注意: `packages/domain` の計算ロジックを変更するリリース
 
