@@ -24,5 +24,8 @@
     // （SameSite=None / crossSubDomainCookies は不要）。
     "BETTER_AUTH_URL": "https://warikan.api.tom-chiba.com",
     "WEB_ORIGIN": "https://warikan.tom-chiba.com",
+    // メール送信元（非機密 / #70）。Resend で検証済みのドメインのアドレスにする。
+    // API キー(RESEND_API_KEY)は機密のため vars には置かず `wrangler secret put` で管理する。
+    "RESEND_FROM": "no-reply@warikan.tom-chiba.com",
   },
 }

@@ -5,6 +5,7 @@ import { provideDb } from "./middleware/provide-db";
 import { requireAuth } from "./middleware/require-auth";
 import { requireGroupMember } from "./middleware/require-group-member";
 import { routes } from "./rpc";
+import { testEmail } from "./routes/test-email";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -24,6 +25,19 @@ app.use("*", (c, next) =>
 // Better Auth のハンドラ（catch-all のため型付き RPC クライアントには含めない。
 // フロントエンドは better-auth のクライアントから利用する）。
 app.on(["GET", "POST"], "/api/auth/*", (c) => createAuth(c.env).handler(c.req.raw));
+
+// メール送信の動作確認・テスト用ルート（#70）。EMAIL_TEST_INBOX === "1" のときだけ有効化する。
+// 本番 wrangler.jsonc にこのフラグは無いため、本番では GET/POST/DELETE とも 404 になる。
+// （上の CORS は OPTIONS を 204 で先取りするため、OPTIONS だけはこのガードに到達しない。
+// ただしこれは全パス共通の挙動で、本文も機密も返さずエンドポイント存在の判別材料にもならない。）
+// "1" との厳密比較は TEST_HASH と同様、"0"/"false" の誤設定で有効化されないようにするため。
+app.use("/__test__/*", async (c, next) => {
+  if (c.env.EMAIL_TEST_INBOX !== "1") {
+    return c.notFound();
+  }
+  await next();
+});
+app.route("/__test__", testEmail);
 
 // グループ配下のルートにミドルウェアを適用する。
 // Env/DB/auth に依存する処理は Bindings を持つ index.ts 側に集約し、
