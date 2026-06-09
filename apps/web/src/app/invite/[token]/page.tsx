@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthPanel } from "@/app/auth-panel";
+import { VerificationSentNotice } from "@/app/verification-sent-notice";
 import { SessionPending } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useSession } from "@/lib/auth-client";
@@ -17,6 +18,9 @@ export default function InvitePage() {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 招待ページからのサインアップ（#69 の仮登録）後に出す確認メール案内。
+  // page.tsx と同じく、セッション再取得の isPending で消えないよう isPending 判定より前に出す。
+  const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
 
   // 招待のプレビュー（グループ名・有効性・参加済みか）。ログイン済みのときだけ取得する。
   const {
@@ -36,6 +40,19 @@ export default function InvitePage() {
     },
   });
 
+  // サインアップ直後（仮登録）はセッションが無いまま確認メール案内を出す。isPending 判定より前に出す。
+  if (signedUpEmail) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
+        <div className="flex flex-col items-center gap-1">
+          <span className="kicker">Invitation</span>
+          <h1 className="headline">グループへの招待</h1>
+        </div>
+        <VerificationSentNotice email={signedUpEmail} onBack={() => setSignedUpEmail(null)} />
+      </main>
+    );
+  }
+
   if (isPending) {
     return <SessionPending />;
   }
@@ -51,7 +68,7 @@ export default function InvitePage() {
           <h1 className="headline">グループへの招待</h1>
         </div>
         <p className="note-muted">参加するにはサインアップまたはサインインしてください。</p>
-        <AuthPanel defaultMode="signUp" />
+        <AuthPanel defaultMode="signUp" onSignedUp={setSignedUpEmail} />
       </main>
     );
   }

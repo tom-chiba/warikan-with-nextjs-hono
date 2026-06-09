@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signUpAndVerify } from "./helpers/auth";
 
 test("未ログインでトップページを開くとサインイン/サインアップフォームを表示する", async ({
   page,
@@ -26,16 +27,9 @@ test("ログイン済みでグループが 1 件なら、トップページで�
   // 実行ごとに一意のメールにして「既に存在」を避ける。
   const email = `e2e-home-${Date.now()}@example.com`;
 
-  await page.goto("/");
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill("Home User");
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill("password1234");
-  await page.getByRole("button", { name: "サインアップ" }).click();
+  // #69: サインアップ後、確認リンクを踏んで本登録（ログイン状態）にする。
   // ログイン状態になると常設ナビが出て、グループ 0 件のうちは作成への誘導が表示される（#51）。
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
-    timeout: 30_000,
-  });
+  await signUpAndVerify(page, { name: "Home User", email });
 
   // グループを 1 件作成してトップへ戻ると、クイック入力フォームが表示される。
   await page.goto("/groups");

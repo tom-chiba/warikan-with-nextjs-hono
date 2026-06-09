@@ -1,18 +1,11 @@
 import { expect, type Page, test } from "@playwright/test";
+import { completeVerification, signUpAndVerify, submitSignUp } from "./helpers/auth";
 
-// サインアップしてグループを 1 つ作成し、そのグループ画面まで遷移する共通操作。
+// サインアップ（#69 の確認リンク踏破まで）してグループを 1 つ作成し、そのグループ画面まで遷移する共通操作。
 // 実行ごとに一意のメールにして「既に存在」を避ける（settings.spec.ts と同じパターン）。
 async function signUpAndCreateGroup(page: Page, name: string, email: string, groupName: string) {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill(name);
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill("password1234");
-  await page.getByRole("button", { name: "サインアップ" }).click();
   // ログイン状態になると常設ナビとグループ作成への誘導が出る（#51）。
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
-    timeout: 30_000,
-  });
+  await signUpAndVerify(page, { name, email });
 
   await page.goto("/groups");
   await page.getByLabel("グループ名").fill(groupName);
@@ -37,12 +30,11 @@ async function signUpAndJoinViaInvite(
   groupName: string,
 ) {
   await page.goto(invitePath);
-  // 未ログインなので認証パネルが出る。サインアップするとセッションが更新され参加確認に切り替わる。
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill(name);
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill("password1234");
-  await page.getByRole("button", { name: "サインアップ" }).click();
+  // 未ログインなので認証パネルが出る。#69 によりサインアップは仮登録のため、確認リンクを踏んで
+  // 本登録（サインイン状態）にしてから招待ページへ戻ると、参加確認に切り替わる。
+  await submitSignUp(page, { name, email });
+  await completeVerification(page, email);
+  await page.goto(invitePath);
 
   await expect(page.getByText(groupName)).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "参加する" }).click();

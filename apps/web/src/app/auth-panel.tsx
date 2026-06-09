@@ -24,19 +24,27 @@ function verifyEmailCallbackURL(): string {
 
 // サインアップ/サインインのフォーム。サインイン成功時のセッション反映による出し分けは呼び出し側で行う。
 // サインインに名前は不要なため、タブで画面を分けて名前フィールドの表示を出し分ける（#60）。
-// サインアップは #69 のメール検証導入により成功してもセッションは張られない（仮登録）。そのため
-// 成功後はこのコンポーネント内で「確認メールを送信しました」表示に切り替える。
+// サインアップは #69 のメール検証導入により成功してもセッションは張られない（仮登録）。成功時は
+// onSignedUp(email) を呼び、「確認メールを送信しました」表示は親側（VerificationSentNotice）に委ねる。
+// 理由: サインアップ成功で Better Auth がセッションを再取得し、useSession が一時的に isPending に
+// なると親が SessionPending を出して AuthPanel を再マウントする。その表示を内部 state で持つと
+// 失われるため、セッション解決に左右されない親で保持する。
 // defaultMode: 新規ユーザーが主な流入元（招待リンク等）ではサインアップを初期表示にする。
-export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode } = {}) {
+export function AuthPanel({
+  defaultMode = "signIn",
+  onSignedUp,
+}: {
+  defaultMode?: AuthMode;
+  onSignedUp?: (email: string) => void;
+} = {}) {
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  // サインアップ成功後の「確認メールを送信しました」表示（仮登録状態）。
-  const [signedUp, setSignedUp] = useState(false);
   // 未検証のままサインインを試みた（403 EMAIL_NOT_VERIFIED）。再送ボタンを示す。
+  // サインイン失敗はセッションを変えず親の再マウントを誘発しないため、この state は内部で保持できる。
   const [needsVerification, setNeedsVerification] = useState(false);
   // 確認メールの明示的な再送の進行状態と完了表示。
   const [resending, setResending] = useState(false);
@@ -85,10 +93,10 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
       setSubmitting(false);
       return;
     }
-    // サインアップは成功してもセッションが張られない（仮登録）。確認メール送信済みの表示に切り替える。
+    // サインアップは成功してもセッションが張られない（仮登録）。確認メール送信済みの表示は親に委ねる。
     // サインインの成功はセッションが張られ、呼び出し側（page.tsx）がログイン後 UI を描画する。
     if (mode === "signUp") {
-      setSignedUp(true);
+      onSignedUp?.(email.trim());
     }
     setSubmitting(false);
   }
@@ -113,7 +121,6 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
     if (next === mode || submitting) return;
     setMode(next);
     setError(null);
-    setSignedUp(false);
     setNeedsVerification(false);
     setResent(false);
   }
@@ -132,32 +139,6 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
             : "signIn";
     switchMode(next);
     tabRefs.current[next]?.focus();
-  }
-
-  // サインアップ成功後の確認メール送信済み表示（仮登録状態）。
-  // forgot-password の送信完了表示と同じく、フォームを隠して次の操作（メール確認）へ誘導する。
-  if (signedUp) {
-    return (
-      <div className="flex w-full max-w-xs flex-col gap-4">
-        <p className="note-ok">
-          確認メールを送信しました。メール内のリンクをクリックすると登録が完了し、サインインできるようになります。
-        </p>
-        <p className="note-muted">
-          メールが届かない場合は、迷惑メールフォルダをご確認のうえ、下のボタンから再送してください。
-        </p>
-        {resent && <p className="note-ok">確認メールを再送しました。</p>}
-        <button type="button" onClick={handleResend} disabled={resending} className="btn btn-line">
-          確認メールを再送
-        </button>
-        <button
-          type="button"
-          onClick={() => switchMode("signIn")}
-          className="link-quiet self-start"
-        >
-          サインインへ戻る
-        </button>
-      </div>
-    );
   }
 
   return (

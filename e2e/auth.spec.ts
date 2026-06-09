@@ -1,22 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { signUpAndVerify } from "./helpers/auth";
 
-test("メールでサインアップするとログイン状態になり、サインアウトできる", async ({ page }) => {
+test("メールでサインアップ→確認リンクで本登録するとログイン状態になり、サインアウトできる", async ({
+  page,
+}) => {
   // 実行ごとに一意のメールにして「既に存在」を避ける。
   const email = `e2e-${Date.now()}@example.com`;
 
-  await page.goto("/");
-
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill("E2E User");
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill("password1234");
-  await page.getByRole("button", { name: "サインアップ" }).click();
-
-  // ブラウザ→api のクロスオリジン認証が通り、ログイン状態になる
-  //（常設ナビとグループ作成への誘導が出る。#51 でメール表示・サインアウトは設定へ移動）。
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
-    timeout: 30_000,
-  });
+  // #69: サインアップは仮登録。確認メールのリンクを踏んで本登録（ログイン状態）になる。
+  await signUpAndVerify(page, { name: "E2E User", email });
 
   // サインアウトは歯車 → 設定ハブから行う。アカウント情報にメールが表示される。
   await page.getByRole("link", { name: "設定" }).click();

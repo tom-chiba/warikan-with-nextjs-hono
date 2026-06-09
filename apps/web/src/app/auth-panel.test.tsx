@@ -182,38 +182,20 @@ test("タブを切り替えるとエラー表示をクリアする", async () =>
   expect(screen.queryByText("認証に失敗しました")).not.toBeInTheDocument();
 });
 
-test("サインアップ成功後は確認メール送信済みの表示に切り替える（#69）", async () => {
+test("サインアップ成功時は onSignedUp(email) を呼ぶ（仮登録: 表示は親に委ねる）（#69）", async () => {
   const user = userEvent.setup();
   vi.mocked(signUp.email).mockResolvedValue({ error: null } as never);
-  render(<AuthPanel defaultMode="signUp" />);
+  const onSignedUp = vi.fn();
+  render(<AuthPanel defaultMode="signUp" onSignedUp={onSignedUp} />);
 
   await user.type(screen.getByLabelText("名前"), "太郎");
-  await user.type(screen.getByLabelText("メールアドレス"), "taro@example.com");
+  await user.type(screen.getByLabelText("メールアドレス"), " taro@example.com ");
   await user.type(screen.getByLabelText("パスワード"), "password123");
   await user.click(screen.getByRole("button", { name: "サインアップ" }));
 
-  // セッションは張られないため、フォームに代わり確認メール送信済みの案内を出す。
-  expect(screen.getByText(/確認メールを送信しました/)).toBeInTheDocument();
-  expect(screen.queryByLabelText("名前")).not.toBeInTheDocument();
-});
-
-test("サインアップ完了画面の再送ボタンで確認メールを再送できる（#69）", async () => {
-  const user = userEvent.setup();
-  vi.mocked(signUp.email).mockResolvedValue({ error: null } as never);
-  vi.mocked(sendVerificationEmail).mockResolvedValue({ error: null } as never);
-  render(<AuthPanel defaultMode="signUp" />);
-
-  await user.type(screen.getByLabelText("名前"), "太郎");
-  await user.type(screen.getByLabelText("メールアドレス"), "taro@example.com");
-  await user.type(screen.getByLabelText("パスワード"), "password123");
-  await user.click(screen.getByRole("button", { name: "サインアップ" }));
-
-  await user.click(screen.getByRole("button", { name: "確認メールを再送" }));
-
-  expect(sendVerificationEmail).toHaveBeenCalledWith(
-    expect.objectContaining({ email: "taro@example.com" }),
-  );
-  expect(screen.getByText(/確認メールを再送しました/)).toBeInTheDocument();
+  // セッションは張られないため、確認メール案内（VerificationSentNotice）への切り替えは親が行う。
+  // AuthPanel は trim 済みメールで onSignedUp を呼ぶだけ。
+  expect(onSignedUp).toHaveBeenCalledWith("taro@example.com");
 });
 
 test("未検証サインイン（EMAIL_NOT_VERIFIED）は案内と再送ボタンを表示する（#69）", async () => {

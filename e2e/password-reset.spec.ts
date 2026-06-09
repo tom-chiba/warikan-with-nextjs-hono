@@ -1,8 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-
-// API のオリジン。playwright.config の baseURL は web(:3000) を指すため、受信箱エンドポイント
-// /__test__/* を叩くには api(:8787) を直接指定する必要がある（webServer で api を :8787 に起動）。
-const API_ORIGIN = "http://localhost:8787";
+import { API_ORIGIN, signUpAndVerify } from "./helpers/auth";
 
 interface SentEmail {
   to: string;
@@ -11,17 +8,9 @@ interface SentEmail {
   html?: string;
 }
 
-// サインアップしてログイン状態にする共通操作（auth.spec.ts と同じパターン）。
+// サインアップ（#69 の確認リンク踏破まで）してログイン状態にする共通操作。
 async function signUp(page: Page, email: string, password: string) {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill("E2E Reset User");
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill(password);
-  await page.getByRole("button", { name: "サインアップ" }).click();
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
-    timeout: 30_000,
-  });
+  await signUpAndVerify(page, { name: "E2E Reset User", email, password });
 }
 
 // 受信箱から指定宛先の最新メールの再設定リンク URL を取り出す。
