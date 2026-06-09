@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { signUpAndGetCookie } from "../helpers/auth-session";
+import { clearEmails, listEmails } from "../helpers/email-inbox";
 
 const BASE = env.BETTER_AUTH_URL;
 
@@ -33,24 +34,54 @@ async function getDbEmail(originalOrNewEmail: string): Promise<string | null> {
   return row?.email ?? null;
 }
 
+// 新アドレス宛に届いた確認メールのリンク（GET）を踏み、メール変更を確定させる。
+// #69 でメール検証を有効化したため、検証済みユーザーの change-email は即時変更せず、
+// 新アドレス宛に確認リンクを送る（Better Auth の change-email-verification フロー）。
+// リンクを踏むと email が新アドレスへ更新され、callbackURL("/") へ 302 リダイレクトする。
+async function completeEmailChange(cookie: string, to: string) {
+  const mail = (await listEmails()).findLast((e) => e.to === to);
+  expect(mail, `${to} 宛の確認メールが受信箱に無い`).toBeTruthy();
+  const body = mail?.text ?? mail?.html ?? "";
+  const match = body.match(/https?:\/\/[^\s"]+/);
+  expect(match, `確認リンクがメール本文に無い: ${body}`).toBeTruthy();
+  // 同じブラウザ（cookie）でリンクを踏む想定。session.user.email が変更前メールと一致するため
+  // INVALID_USER にならず変更が確定する。
+  const res = await SELF.fetch(match?.[0] ?? "", { headers: { cookie }, redirect: "manual" });
+  expect(res.status).toBe(302);
+}
+
 describe("POST /api/auth/change-email（メールアドレス変更）", () => {
-  it("新しいメールアドレスに変更でき、変更後のメールでサインインできる", async () => {
+  // signUpAndGetCookie は #69 のサインアップ時確認メールを 1 通発生させる。
+  // change-email の確認メールだけを観測したいため各テスト前にクリアする。
+  beforeEach(async () => {
+    await clearEmails();
+  });
+
+  it("確認リンク踏破で新しいメールに変更でき、変更後のメールでサインインできる", async () => {
     const cookie = await signUpAndGetCookie("ce-basic@example.com");
+    await clearEmails();
 
     const res = await changeEmail(cookie, "ce-basic-new@example.com");
-
     expect(res.status).toBe(200);
+    // 確認リンクを踏むまでは変更されない。
+    expect(await getDbEmail("ce-basic-new@example.com")).toBeNull();
+    expect(await getDbEmail("ce-basic@example.com")).toBe("ce-basic@example.com");
+
+    await completeEmailChange(cookie, "ce-basic-new@example.com");
     expect(await getDbEmail("ce-basic-new@example.com")).toBe("ce-basic-new@example.com");
     expect(await getDbEmail("ce-basic@example.com")).toBeNull();
+
     const signInRes = await signIn("ce-basic-new@example.com");
     expect(signInRes.status).toBe(200);
   });
 
-  it("変更後も既存セッションが維持される（同じ cookie で新メールのセッションが取れる）", async () => {
+  it("確認リンク踏破後も同じ cookie で新メールのセッションが取れる", async () => {
     const cookie = await signUpAndGetCookie("ce-session@example.com");
+    await clearEmails();
 
     const res = await changeEmail(cookie, "ce-session-new@example.com");
     expect(res.status).toBe(200);
+    await completeEmailChange(cookie, "ce-session-new@example.com");
 
     const sessionRes = await SELF.fetch(`${BASE}/api/auth/get-session`, {
       headers: { cookie },
@@ -62,10 +93,12 @@ describe("POST /api/auth/change-email（メールアドレス変更）", () => {
 
   it("大文字を含む入力は小文字に正規化して保存される", async () => {
     const cookie = await signUpAndGetCookie("ce-case@example.com");
+    await clearEmails();
 
     const res = await changeEmail(cookie, "CE-Case-New@Example.com");
-
     expect(res.status).toBe(200);
+    // 確認メールは正規化後の小文字アドレス宛に届く。
+    await completeEmailChange(cookie, "ce-case-new@example.com");
     expect(await getDbEmail("ce-case-new@example.com")).toBe("ce-case-new@example.com");
   });
 
