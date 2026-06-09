@@ -24,7 +24,9 @@ export default function ForgotPasswordPage() {
       // redirectTo はメール内リンクを踏んだあとの遷移先（このアプリの /reset-password）。
       // API がトークンを検証し、?token= または ?error=INVALID_TOKEN を付けてここへ戻す。
       const res = await authClient.requestPasswordReset({
-        email,
+        // 活性化ガードと同じく trim して送る。末尾空白付き（モバイルの自動補完等）でも
+        // 登録済みメールと一致させ、サーバーの email バリデーションで弾かれないようにする。
+        email: email.trim(),
         redirectTo: `${window.location.origin}/reset-password`,
       });
       if (res.error) {

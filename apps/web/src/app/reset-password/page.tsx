@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { passwordRuleErrorMessage } from "@/lib/auth-error";
 
 // メール内リンクの遷移先（#68）。API がトークンを検証したのち、
 // 有効なら ?token=、無効・期限切れなら ?error=INVALID_TOKEN を付けてここへリダイレクトする。
@@ -56,15 +57,13 @@ function ResetPasswordForm() {
     try {
       const res = await authClient.resetPassword({ newPassword, token });
       if (res.error) {
-        // Better Auth 本体のエラーメッセージは英語のため、UI で起きうるものはコードから日本語にマップする。
+        // INVALID_TOKEN はこの画面固有。長さ規則は change-password と共通のため共有ヘルパーに委ねる。
         setError(
           res.error.code === "INVALID_TOKEN"
             ? "リンクが無効か期限切れです。お手数ですが再度パスワード再設定をお試しください。"
-            : res.error.code === "PASSWORD_TOO_SHORT"
-              ? "パスワードは8文字以上で入力してください"
-              : res.error.code === "PASSWORD_TOO_LONG"
-                ? "パスワードは128文字以内で入力してください"
-                : (res.error.message ?? "パスワードの再設定に失敗しました"),
+            : (passwordRuleErrorMessage(res.error.code) ??
+                res.error.message ??
+                "パスワードの再設定に失敗しました"),
         );
         return;
       }

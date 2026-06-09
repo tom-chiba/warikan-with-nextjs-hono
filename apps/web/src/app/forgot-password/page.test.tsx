@@ -49,6 +49,18 @@ test("送信に成功すると中立メッセージを表示し、redirectTo 付
   expect(screen.queryByLabelText("メールアドレス")).not.toBeInTheDocument();
 });
 
+test("前後の空白を除いて送信する（モバイル自動補完の末尾空白対策）", async () => {
+  requestPasswordResetMock.mockResolvedValue({ error: null });
+
+  render(<ForgotPasswordPage />);
+  await submit("  user@example.com  ");
+
+  expect(requestPasswordResetMock).toHaveBeenCalledWith({
+    email: "user@example.com",
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+});
+
 test("サーバーエラー時はエラーメッセージを表示しフォームは残る", async () => {
   requestPasswordResetMock.mockResolvedValue({
     error: { message: "送信に失敗しました。時間をおいて再度お試しください。" },
