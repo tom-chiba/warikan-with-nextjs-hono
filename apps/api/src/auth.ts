@@ -5,6 +5,8 @@ import { eq, notExists } from "drizzle-orm";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
 import { group, groupMember, user } from "./db/schema";
+import { createEmailSender } from "./email";
+import { buildResetPasswordEmail } from "./email/reset-password-email";
 import { testPasswordHasher } from "./internal/test-password-hasher";
 
 // D1 バインディングや secret は実行時 env から渡るため、
@@ -24,6 +26,24 @@ export function createAuth(env: Env) {
     }),
     emailAndPassword: {
       enabled: true,
+      // パスワード再設定の完了時、そのユーザーの全セッション（他端末含む）を失効させる（#68）。
+      // 再設定は「パスワードを忘れた／漏えいを疑う」文脈であり、change-password の
+      // revokeOtherSessions: true（#61）と同じく既存セッションを残さない方が安全。
+      revokeSessionsOnPasswordReset: true,
+      // パスワード再設定メールの送信（#68）。createEmailSender(env) で得た送信関数に
+      // 再設定リンク url を載せて呼ぶだけ（ADR-0015 / ADR-0016）。
+      // 重要: ここで例外を投げないこと。request-password-reset は未登録メールでは
+      // sendResetPassword を呼ばずに 200 を返すため、送信失敗で再スローすると
+      // 「登録済みだけ 500・未登録は 200」となりメールアドレスの存在有無が漏れる。
+      // 列挙対策（受け入れ条件）を守るため、送信失敗はログに留め応答を常に同一にする。
+      sendResetPassword: async ({ user: targetUser, url }) => {
+        try {
+          const sendEmail = createEmailSender(env);
+          await sendEmail(buildResetPasswordEmail({ to: targetUser.email, url }));
+        } catch (err) {
+          console.error("パスワード再設定メールの送信に失敗しました", err);
+        }
+      },
       // テスト時のみ scrypt を SHA-256 に差し替えてテストを高速化する(#42 / ADR-0012)。
       // TEST_HASH は vitest.config.ts の miniflare.bindings でのみ注入され、
       // 本番 wrangler.jsonc には存在しないため常に undefined = scrypt のまま。
