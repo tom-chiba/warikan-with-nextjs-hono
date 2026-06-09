@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { type FormEvent, type KeyboardEvent, useRef, useState } from "react";
 import { signIn, signUp } from "@/lib/auth-client";
 
@@ -148,6 +149,12 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
         <button type="submit" disabled={submitting} className="btn btn-fill">
           {TAB_LABELS[mode]}
         </button>
+        {/* パスワード再設定への導線（#68）。名前が不要なサインイン時にのみ示す。 */}
+        {mode === "signIn" && (
+          <Link href="/forgot-password" className="link-quiet self-start">
+            パスワードをお忘れですか？
+          </Link>
+        )}
       </div>
     </form>
   );

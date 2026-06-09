@@ -5,6 +5,8 @@ import { eq, notExists } from "drizzle-orm";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
 import { group, groupMember, user } from "./db/schema";
+import { createEmailSender } from "./email";
+import { buildResetPasswordEmail } from "./email/reset-password-email";
 import { testPasswordHasher } from "./internal/test-password-hasher";
 
 // D1 バインディングや secret は実行時 env から渡るため、
@@ -24,6 +26,26 @@ export function createAuth(env: Env) {
     }),
     emailAndPassword: {
       enabled: true,
+      // パスワード再設定の完了時、そのユーザーの全セッション（他端末含む）を失効させる（#68）。
+      // 再設定は「パスワードを忘れた／漏えいを疑う」文脈であり、change-password の
+      // revokeOtherSessions: true（#61）と同じく既存セッションを残さない方が安全。
+      revokeSessionsOnPasswordReset: true,
+      // パスワード再設定メールの送信（#68）。createEmailSender(env) で得た送信関数に
+      // 再設定リンク url を載せて呼ぶだけ（ADR-0015 / ADR-0016）。
+      // ここで例外を外へ漏らさないこと（列挙対策）。request-password-reset は未登録メールでは
+      // sendResetPassword を呼ばずに 200 を返すため、送信失敗が応答に影響すると
+      // 「登録済みだけエラー・未登録は 200」となりメールアドレスの存在有無が漏れる。
+      // Better Auth 本体も sendResetPassword を runInBackgroundOrAwait 経由で呼び、例外を
+      // ログのみで握りつぶす（v1.6 時点）ため二重の防御になるが、その内部実装に依存せず
+      // 自前でも try/catch して応答を常に同一に保ち、ログも自前の文言で残す。
+      sendResetPassword: async ({ user: targetUser, url }) => {
+        try {
+          const sendEmail = createEmailSender(env);
+          await sendEmail(buildResetPasswordEmail({ to: targetUser.email, url }));
+        } catch (err) {
+          console.error("パスワード再設定メールの送信に失敗しました", err);
+        }
+      },
       // テスト時のみ scrypt を SHA-256 に差し替えてテストを高速化する(#42 / ADR-0012)。
       // TEST_HASH は vitest.config.ts の miniflare.bindings でのみ注入され、
       // 本番 wrangler.jsonc には存在しないため常に undefined = scrypt のまま。

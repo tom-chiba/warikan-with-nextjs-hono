@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { passwordRuleErrorMessage } from "@/lib/auth-error";
 
 // 設定ページのパスワード行 + インライン変更フォーム（#61）。
 // 編集中フラグ・入力値・エラー/成功は行内の関心事なのでここに閉じ込め、
@@ -36,15 +37,13 @@ export function PasswordChangeForm() {
         revokeOtherSessions: true,
       });
       if (res.error) {
-        // Better Auth 本体のエラーメッセージは英語のため、UI で起きうるものはコードから日本語にマップする。
+        // INVALID_PASSWORD はこの画面固有。長さ規則は reset-password と共通のため共有ヘルパーに委ねる。
         setError(
           res.error.code === "INVALID_PASSWORD"
             ? "現在のパスワードが正しくありません"
-            : res.error.code === "PASSWORD_TOO_SHORT"
-              ? "新しいパスワードは8文字以上で入力してください"
-              : res.error.code === "PASSWORD_TOO_LONG"
-                ? "新しいパスワードは128文字以内で入力してください"
-                : (res.error.message ?? "パスワードの変更に失敗しました"),
+            : (passwordRuleErrorMessage(res.error.code, "新しいパスワード") ??
+                res.error.message ??
+                "パスワードの変更に失敗しました"),
         );
         return;
       }

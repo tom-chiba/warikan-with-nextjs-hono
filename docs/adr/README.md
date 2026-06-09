@@ -29,3 +29,4 @@
 | 0013 | [精算ロジックの共有ドメインパッケージ化とサーバー側検証](./0013-shared-domain-package.md)          | accepted |
 | 0014 | [React Compiler による自動メモ化の採用](./0014-react-compiler.md)                                  | accepted |
 | 0015 | [メール送信基盤（Resend + 薄い抽象 + テスト受信箱）の採用](./0015-email-sending-infrastructure.md) | accepted |
+| 0016 | [パスワード再設定（Better Auth + メール送信基盤）の採用](./0016-password-reset.md)                 | accepted |
