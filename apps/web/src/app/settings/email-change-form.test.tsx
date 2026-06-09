@@ -21,7 +21,8 @@ afterEach(() => {
 
 const CURRENT_EMAIL = "me@example.com";
 
-// EmailChangeForm は成功時にメンバー一覧キャッシュを無効化するため QueryClient が必要。
+// EmailChangeForm は settings ページ配下で QueryClient コンテキスト内に置かれるため、
+// テストでも同じコンテキストで描画する。
 function renderForm() {
   renderWithClient(<EmailChangeForm currentEmail={CURRENT_EMAIL} />);
 }
@@ -59,15 +60,18 @@ test("現在のメールアドレスのままでは保存ボタンが無効に�
   expect(screen.getByRole("button", { name: "保存" })).toBeDisabled();
 });
 
-test("変更に成功するとフォームが閉じて成功メッセージが表示される", async () => {
+test("変更を要求するとフォームが閉じて確認メール送信の案内が表示される（#69）", async () => {
   changeEmailMock.mockResolvedValue({ error: null });
 
   renderForm();
   await openForm();
   await submitNewEmail("new@example.com");
 
-  expect(changeEmailMock).toHaveBeenCalledWith({ newEmail: "new@example.com" });
-  await waitFor(() => expect(screen.getByText("メールアドレスを変更しました")).toBeInTheDocument());
+  // #69 で検証済みユーザーの変更は新アドレス宛の確認リンク方式になり、callbackURL を渡す。
+  expect(changeEmailMock).toHaveBeenCalledWith(
+    expect.objectContaining({ newEmail: "new@example.com" }),
+  );
+  await waitFor(() => expect(screen.getByText(/確認メールを送信しました/)).toBeInTheDocument());
   expect(screen.queryByLabelText("新しいメールアドレス")).not.toBeInTheDocument();
 });
 
