@@ -1,20 +1,13 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getUserId, signUpAndGetCookie } from "../helpers/auth-session";
+import { clearEmails, listEmails, type SentEmail } from "../helpers/email-inbox";
 
 const BASE = env.BETTER_AUTH_URL;
 
 // ブラウザが付与する Origin ヘッダ。Better Auth は origin/referer が無い、または trustedOrigins
 // 外だと CSRF として弾くため、実際のクライアントと同様に origin を明示する。
 const WEB_ORIGIN = env.WEB_ORIGIN.split(",")[0];
-
-interface SentEmail {
-  from: string;
-  to: string;
-  subject: string;
-  text?: string;
-  html?: string;
-}
 
 // 再設定メールを要求する。redirectTo は Web の /reset-password を指す（実クライアントと同様）。
 function requestPasswordReset(email: string) {
@@ -42,12 +35,6 @@ function signIn(email: string, password: string) {
   });
 }
 
-async function listEmails(): Promise<SentEmail[]> {
-  const res = await SELF.fetch(`${BASE}/__test__/emails`);
-  const { emails } = await res.json<{ emails: SentEmail[] }>();
-  return emails;
-}
-
 // 受信したメール本文から再設定リンクのトークンを取り出す。
 // リンクは ${BASE}/api/auth/reset-password/<token>?callbackURL=... の形。
 function extractToken(email: SentEmail): string {
@@ -62,7 +49,7 @@ function extractToken(email: SentEmail): string {
 describe("パスワード再設定（#68）", () => {
   // 受信箱はモジュールスコープで蓄積されるため、テスト間でクリアして独立性を保つ。
   beforeEach(async () => {
-    await SELF.fetch(`${BASE}/__test__/emails`, { method: "DELETE" });
+    await clearEmails();
   });
 
   it("登録済みメールには再設定リンク付きメールが届く", async () => {

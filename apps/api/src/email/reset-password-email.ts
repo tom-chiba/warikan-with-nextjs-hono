@@ -6,7 +6,9 @@ import type { MailMessage } from "./index";
 // url は Better Auth が生成した API の確認リンク
 //（${BETTER_AUTH_URL}/api/auth/reset-password/:token?callbackURL=<web の /reset-password>）。
 // これを踏むと API がトークンを検証し、Web の /reset-password へ ?token= 付きでリダイレクトする。
-// url は Better Auth 由来で属性値として安全なため、HTML にはエスケープせずそのまま埋め込む。
+// token は英数字 ID、callbackURL は encodeURIComponent 済みで、現状この url は & 等の HTML 特殊文字を
+// 含まない。そのため <a href> 属性値にそのまま埋め込んでも壊れない。将来クエリパラメータが増えて
+// & を含むようになる場合は属性値のエスケープ（&amp; 等）が必要になるため、ここを見直すこと。
 export function buildResetPasswordEmail({ to, url }: { to: string; url: string }): MailMessage {
   // サービス名は test-email.ts の件名と同じく "warikan"。API 側に共有定数は無いため直書きする。
   const subject = "【warikan】パスワード再設定のご案内";

@@ -1,6 +1,7 @@
 import { expect, type Page, test } from "@playwright/test";
 
-// API のオリジン（受信箱エンドポイント /__test__/* はここに生える）。
+// API のオリジン。playwright.config の baseURL は web(:3000) を指すため、受信箱エンドポイント
+// /__test__/* を叩くには api(:8787) を直接指定する必要がある（webServer で api を :8787 に起動）。
 const API_ORIGIN = "http://localhost:8787";
 
 interface SentEmail {

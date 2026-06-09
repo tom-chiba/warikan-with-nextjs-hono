@@ -32,10 +32,12 @@ export function createAuth(env: Env) {
       revokeSessionsOnPasswordReset: true,
       // パスワード再設定メールの送信（#68）。createEmailSender(env) で得た送信関数に
       // 再設定リンク url を載せて呼ぶだけ（ADR-0015 / ADR-0016）。
-      // 重要: ここで例外を投げないこと。request-password-reset は未登録メールでは
-      // sendResetPassword を呼ばずに 200 を返すため、送信失敗で再スローすると
-      // 「登録済みだけ 500・未登録は 200」となりメールアドレスの存在有無が漏れる。
-      // 列挙対策（受け入れ条件）を守るため、送信失敗はログに留め応答を常に同一にする。
+      // ここで例外を外へ漏らさないこと（列挙対策）。request-password-reset は未登録メールでは
+      // sendResetPassword を呼ばずに 200 を返すため、送信失敗が応答に影響すると
+      // 「登録済みだけエラー・未登録は 200」となりメールアドレスの存在有無が漏れる。
+      // Better Auth 本体も sendResetPassword を runInBackgroundOrAwait 経由で呼び、例外を
+      // ログのみで握りつぶす（v1.6 時点）ため二重の防御になるが、その内部実装に依存せず
+      // 自前でも try/catch して応答を常に同一に保ち、ログも自前の文言で残す。
       sendResetPassword: async ({ user: targetUser, url }) => {
         try {
           const sendEmail = createEmailSender(env);

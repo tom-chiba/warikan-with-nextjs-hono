@@ -151,7 +151,7 @@ export function AuthPanel({ defaultMode = "signIn" }: { defaultMode?: AuthMode }
         </button>
         {/* パスワード再設定への導線（#68）。名前が不要なサインイン時にのみ示す。 */}
         {mode === "signIn" && (
-          <Link href="/forgot-password" className="self-start text-sm text-muted underline">
+          <Link href="/forgot-password" className="link-quiet self-start">
             パスワードをお忘れですか？
           </Link>
         )}
