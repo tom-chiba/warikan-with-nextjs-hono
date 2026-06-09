@@ -53,8 +53,11 @@ test("パスワードを忘れたユーザーがメールのリンクから再�
   await page.getByRole("button", { name: "サインアウト" }).click();
   await expect(page.getByRole("button", { name: "サインイン" })).toBeVisible();
 
-  // サインイン画面から再設定フローに入る。
+  // サインイン画面から再設定フローに入る。リンクはクライアント遷移のため、
+  // 遷移完了（再設定ページの見出し表示）を待ってから入力する（ホーム側の入力欄に
+  // 先行入力して遷移で値が失われるレースを避ける）。
   await page.getByRole("link", { name: "パスワードをお忘れですか？" }).click();
+  await expect(page.getByRole("heading", { name: "パスワード再設定" })).toBeVisible();
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByRole("button", { name: "再設定リンクを送信" }).click();
   await expect(
