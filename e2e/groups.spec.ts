@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { completeVerification, signUpAndVerify, submitSignUp } from "./helpers/auth";
+import { followVerificationLink, signUpAndVerify, submitSignUp } from "./helpers/auth";
 
 // サインアップ（#69 の確認リンク踏破まで）してグループを 1 つ作成し、そのグループ画面まで遷移する共通操作。
 // 実行ごとに一意のメールにして「既に存在」を避ける（settings.spec.ts と同じパターン）。
@@ -30,11 +30,11 @@ async function signUpAndJoinViaInvite(
   groupName: string,
 ) {
   await page.goto(invitePath);
-  // 未ログインなので認証パネルが出る。#69 によりサインアップは仮登録のため、確認リンクを踏んで
-  // 本登録（サインイン状態）にしてから招待ページへ戻ると、参加確認に切り替わる。
+  // 未ログインなので認証パネルが出る。#69 によりサインアップは仮登録。招待からのサインアップは
+  // 確認メールの callbackURL が招待 URL になっており、リンク踏破→autoSignIn でこの招待ページへ戻る。
+  // ここで明示的な再訪をせず、確認リンク踏破だけで招待の参加確認に着地することを検証する。
   await submitSignUp(page, { name, email });
-  await completeVerification(page, email);
-  await page.goto(invitePath);
+  await followVerificationLink(page, email);
 
   await expect(page.getByText(groupName)).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "参加する" }).click();

@@ -8,7 +8,17 @@ import { sendVerificationEmail, verifyEmailCallbackURL } from "@/lib/auth-client
 // useSession が一時的に isPending になると親ページが SessionPending を出して AuthPanel を
 // アンマウントする。AuthPanel の内部 state でこの表示を持つと再マウントで失われるため、
 // セッション解決に左右されない親側でこの通知を保持・描画する。
-export function VerificationSentNotice({ email, onBack }: { email: string; onBack: () => void }) {
+export function VerificationSentNotice({
+  email,
+  onBack,
+  callbackURL,
+}: {
+  email: string;
+  onBack: () => void;
+  // 再送メールの着地先。既定は /verify-email。招待からのサインアップでは招待 URL を渡し、
+  // 初回メール（AuthPanel の verifyCallbackURL）と着地先を揃える。
+  callbackURL?: string;
+}) {
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
 
@@ -17,7 +27,7 @@ export function VerificationSentNotice({ email, onBack }: { email: string; onBac
     setResending(true);
     setResent(false);
     try {
-      await sendVerificationEmail({ email, callbackURL: verifyEmailCallbackURL() });
+      await sendVerificationEmail({ email, callbackURL: callbackURL ?? verifyEmailCallbackURL() });
     } catch {
       // ネットワーク断等。中立表示を保つため握りつぶす。
     }

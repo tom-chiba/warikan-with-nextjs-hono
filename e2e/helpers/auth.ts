@@ -62,11 +62,16 @@ export async function submitSignUp(
   await expect(page.getByText(/確認メールを送信しました/)).toBeVisible({ timeout: 30_000 });
 }
 
-// 受信箱の確認リンクを踏んで検証を完了する。autoSignInAfterVerification によりサインイン状態になり、
-// /verify-email の完了表示に着地する。
-export async function completeVerification(page: Page, email: string) {
+// 受信箱の確認リンク（GET）を踏む。autoSignInAfterVerification によりサインイン状態になり、
+// callbackURL（既定 /verify-email、招待からは招待 URL）へリダイレクトする。着地先の検証は呼び出し側に任せる。
+export async function followVerificationLink(page: Page, email: string) {
   const url = await fetchVerificationUrl(page, email);
   await page.goto(url);
+}
+
+// 確認リンクを踏んで /verify-email の完了表示まで確認する（既定の callbackURL=/verify-email 用）。
+export async function completeVerification(page: Page, email: string) {
+  await followVerificationLink(page, email);
   await expect(page.getByText(/メールアドレスの確認が完了しました/)).toBeVisible({
     timeout: 30_000,
   });

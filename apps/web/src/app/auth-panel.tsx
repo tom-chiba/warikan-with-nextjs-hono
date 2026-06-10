@@ -27,9 +27,13 @@ const TABLIST_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
 export function AuthPanel({
   defaultMode = "signIn",
   onSignedUp,
+  verifyCallbackURL,
 }: {
   defaultMode?: AuthMode;
   onSignedUp?: (email: string) => void;
+  // 確認メール内リンクの着地先。既定は /verify-email。招待からのサインアップでは検証後に招待へ
+  // 戻れるよう、招待 URL を渡して上書きする（リンク踏破→autoSignIn→招待ページで参加できる）。
+  verifyCallbackURL?: string;
 } = {}) {
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [name, setName] = useState("");
@@ -59,22 +63,26 @@ export function AuthPanel({
       setError("名前を入力してください");
       return;
     }
+    // メールは前後空白を除いて送る。モバイルの自動補完等で末尾空白が付くと、未 trim では
+    // 登録アドレスと再送・案内の宛先（いずれも trim 済み）が食い違うため、入口で揃える
+    //（forgot-password と同じ方針）。
+    const trimmedEmail = email.trim();
     setSubmitting(true);
     const res =
       mode === "signUp"
         ? await signUp.email({
             name: trimmedName,
-            email,
+            email: trimmedEmail,
             password,
             // 検証リンク踏破後の着地先。期限切れ等は ?error= 付きでここへ戻る。
-            callbackURL: verifyEmailCallbackURL(),
+            callbackURL: verifyCallbackURL ?? verifyEmailCallbackURL(),
           })
         : // サインインには callbackURL を渡さない。Better Auth クライアントはサインイン成功時に
           // callbackURL があるとそこへリダイレクトするため、検証済みユーザーが毎回 /verify-email へ
           // 飛んでしまう。未検証サインイン（403）時の sendOnSignIn 再送メールは callbackURL 既定の
           // "/" に着地するが、autoSignInAfterVerification によりリンク踏破でそのままアプリに入れる
           // ため実害はない。
-          await signIn.email({ email, password });
+          await signIn.email({ email: trimmedEmail, password });
     if (res.error) {
       // 未検証ユーザーのサインインは 403。Better Auth は sendOnSignIn で確認メールを自動再送するため、
       // その旨を案内しつつ、届かない場合に備えて明示的な再送ボタンも出す。
@@ -95,7 +103,7 @@ export function AuthPanel({
     // サインアップは成功してもセッションが張られない（仮登録）。確認メール送信済みの表示は親に委ねる。
     // サインインの成功はセッションが張られ、呼び出し側（page.tsx）がログイン後 UI を描画する。
     if (mode === "signUp") {
-      onSignedUp?.(email.trim());
+      onSignedUp?.(trimmedEmail);
     }
     setSubmitting(false);
   }
@@ -106,7 +114,10 @@ export function AuthPanel({
     setResending(true);
     setResent(false);
     try {
-      await sendVerificationEmail({ email: email.trim(), callbackURL: verifyEmailCallbackURL() });
+      await sendVerificationEmail({
+        email: email.trim(),
+        callbackURL: verifyCallbackURL ?? verifyEmailCallbackURL(),
+      });
     } catch {
       // ネットワーク断等。中立表示を保つため、ここでは握りつぶす。
     }

@@ -22,6 +22,12 @@ export default function InvitePage() {
   // page.tsx と同じく、セッション再取得の isPending で消えないよう isPending 判定より前に出す。
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
 
+  // 招待からのサインアップは、確認リンク踏破後にこの招待ページへ戻したい（autoSignIn 済みで
+  // そのまま参加できる）。確認メールの callbackURL を /verify-email ではなく招待 URL にする。
+  // window は SSR では無いため undefined にフォールバックし、その場合 AuthPanel 既定（/verify-email）に従う。
+  const inviteCallbackURL =
+    typeof window !== "undefined" ? `${window.location.origin}/invite/${token}` : undefined;
+
   // 招待のプレビュー（グループ名・有効性・参加済みか）。ログイン済みのときだけ取得する。
   const {
     data: preview,
@@ -48,7 +54,11 @@ export default function InvitePage() {
           <span className="kicker">Invitation</span>
           <h1 className="headline">グループへの招待</h1>
         </div>
-        <VerificationSentNotice email={signedUpEmail} onBack={() => setSignedUpEmail(null)} />
+        <VerificationSentNotice
+          email={signedUpEmail}
+          onBack={() => setSignedUpEmail(null)}
+          callbackURL={inviteCallbackURL}
+        />
       </main>
     );
   }
@@ -68,7 +78,11 @@ export default function InvitePage() {
           <h1 className="headline">グループへの招待</h1>
         </div>
         <p className="note-muted">参加するにはサインアップまたはサインインしてください。</p>
-        <AuthPanel defaultMode="signUp" onSignedUp={setSignedUpEmail} />
+        <AuthPanel
+          defaultMode="signUp"
+          onSignedUp={setSignedUpEmail}
+          verifyCallbackURL={inviteCallbackURL}
+        />
       </main>
     );
   }
