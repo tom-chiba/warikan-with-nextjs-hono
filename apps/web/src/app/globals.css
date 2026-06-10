@@ -117,6 +117,15 @@ body {
     @apply w-full rounded-none border border-ink bg-transparent px-3 py-2 transition-colors placeholder:text-muted/70 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20;
   }
 
+  /* iOS Safari は input[type=date] 等の temporal input を inline-flex で描画し、その intrinsic
+     幅が優先されて w-full（width:100%）を無視するため、コンテナからはみ出す（#62）。appearance を
+     外して通常のテキスト入力として扱わせ、w-full と box-sizing を尊重させる。日付ピッカー自体は
+     タップで従来どおり開くため操作性は損なわれない。 */
+  input[type="date"].field {
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
   /* 補足・エラー・成功のテキスト表示。 */
   .note-muted {
     @apply text-sm text-muted;
