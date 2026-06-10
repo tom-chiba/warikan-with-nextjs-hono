@@ -68,7 +68,9 @@ export function ItemForm({
   // 入力中の値は文字列で保持する（空欄と 0 を区別し、IME や前ゼロ等の編集を妨げない）。
   const [payments, setPayments] = useState<Record<string, string>>(initial?.payments ?? EMPTY);
   const [shares, setShares] = useState<Record<string, string>>(initial?.shares ?? EMPTY);
-  const [equalSplit, setEqualSplit] = useState(false);
+  // 等分は新規入力ではデフォルト ON（固定メンバーの日常入力では等分が大半のため）。
+  // 編集時（initial あり）は保存済みの割勘金額を等分で上書きしないよう OFF で始める。
+  const [equalSplit, setEqualSplit] = useState(!initial);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -149,7 +151,7 @@ export function ItemForm({
         setMemo("");
         setPayments(EMPTY);
         setShares(EMPTY);
-        setEqualSplit(false);
+        setEqualSplit(true);
       }
       setSaved(true);
     } catch (err) {
