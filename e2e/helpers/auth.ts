@@ -4,26 +4,48 @@ import { expect, type Page } from "@playwright/test";
 // /__test__/* を叩くには api(:8787) を直接指定する必要がある（password-reset.spec.ts と同じ）。
 export const API_ORIGIN = "http://localhost:8787";
 
-interface SentEmail {
+export interface SentEmail {
   to: string;
   subject: string;
   text?: string;
   html?: string;
 }
 
-// 受信箱から指定宛先の最新メールに含まれる確認リンク URL（API の /api/auth/verify-email?...）を取り出す。
+// 受信箱から指定宛先の最新メール本文を取り出し、linkPattern に一致するリンク URL を返す。
 // メールは #70 のインメモリ受信箱（EMAIL_TEST_INBOX=1）に記録される。宛先は実行ごとに一意のため、
 // 受信箱をクリアしなくても他テストのメールと混ざらない。
-export async function fetchVerificationUrl(page: Page, to: string): Promise<string> {
-  const res = await page.request.get(`${API_ORIGIN}/__test__/emails`);
-  expect(res.ok()).toBeTruthy();
-  const { emails } = (await res.json()) as { emails: SentEmail[] };
-  const mail = emails.findLast((e) => e.to === to);
-  expect(mail, `${to} 宛のメールが受信箱に無い`).toBeTruthy();
-  const body = mail?.text ?? mail?.html ?? "";
-  const match = body.match(/https?:\/\/[^\s"]+\/api\/auth\/verify-email\?[^\s"]+/);
-  expect(match, `確認リンクがメール本文に無い: ${body}`).toBeTruthy();
-  return match?.[0] ?? "";
+// sendOnSignUp 等の送信は runInBackgroundOrAwait でレスポンス後に走りうるため、画面表示直後は
+// まだ記録されていないことがある。expect.poll で記録されるまで待ってから取り出す。
+async function fetchEmailLink(page: Page, to: string, linkPattern: RegExp): Promise<string> {
+  let url = "";
+  await expect
+    .poll(
+      async () => {
+        const res = await page.request.get(`${API_ORIGIN}/__test__/emails`);
+        if (!res.ok()) {
+          return "";
+        }
+        const { emails } = (await res.json()) as { emails: SentEmail[] };
+        const mail = emails.findLast((e) => e.to === to);
+        const body = mail?.text ?? mail?.html ?? "";
+        url = body.match(linkPattern)?.[0] ?? "";
+        return url;
+      },
+      { message: `${to} 宛のメールにリンクが見つからない`, timeout: 15_000 },
+    )
+    .not.toBe("");
+  return url;
+}
+
+// サインアップ時の確認リンク URL（API の /api/auth/verify-email?...）を取り出す。
+export function fetchVerificationUrl(page: Page, to: string): Promise<string> {
+  return fetchEmailLink(page, to, /https?:\/\/[^\s"]+\/api\/auth\/verify-email\?[^\s"]+/);
+}
+
+// パスワード再設定（#68）のリンク URL を取り出す。再設定リンクはパスが固定でない
+//（API がトークン検証後にリダイレクトする）ため、最初の URL を取れば十分。
+export function fetchResetUrl(page: Page, to: string): Promise<string> {
+  return fetchEmailLink(page, to, /https?:\/\/[^\s"]+/);
 }
 
 // 現在開いているページ（トップ / 招待ページ等）のサインアップフォームを送信する。

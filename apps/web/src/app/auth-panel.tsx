@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { type FormEvent, type KeyboardEvent, useRef, useState } from "react";
-import { sendVerificationEmail, signIn, signUp } from "@/lib/auth-client";
+import { sendVerificationEmail, signIn, signUp, verifyEmailCallbackURL } from "@/lib/auth-client";
 
 type AuthMode = "signIn" | "signUp";
 
@@ -15,12 +15,6 @@ const TAB_LABELS: Record<AuthMode, string> = {
 
 // キー判定用の Set。キー押下ごとの配列生成と O(n) 走査を避ける。
 const TABLIST_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
-
-// 確認メール内リンクの遷移先（#69）。検証後はこの /verify-email に着地し、成功・失敗を表示する。
-// 検証メールの url は ${API}/api/auth/verify-email?token=...&callbackURL=<ここ> の形になる。
-function verifyEmailCallbackURL(): string {
-  return `${window.location.origin}/verify-email`;
-}
 
 // サインアップ/サインインのフォーム。サインイン成功時のセッション反映による出し分けは呼び出し側で行う。
 // サインインに名前は不要なため、タブで画面を分けて名前フィールドの表示を出し分ける（#60）。
@@ -75,7 +69,12 @@ export function AuthPanel({
             // 検証リンク踏破後の着地先。期限切れ等は ?error= 付きでここへ戻る。
             callbackURL: verifyEmailCallbackURL(),
           })
-        : await signIn.email({ email, password });
+        : // サインインには callbackURL を渡さない。Better Auth クライアントはサインイン成功時に
+          // callbackURL があるとそこへリダイレクトするため、検証済みユーザーが毎回 /verify-email へ
+          // 飛んでしまう。未検証サインイン（403）時の sendOnSignIn 再送メールは callbackURL 既定の
+          // "/" に着地するが、autoSignInAfterVerification によりリンク踏破でそのままアプリに入れる
+          // ため実害はない。
+          await signIn.email({ email, password });
     if (res.error) {
       // 未検証ユーザーのサインインは 403。Better Auth は sendOnSignIn で確認メールを自動再送するため、
       // その旨を案内しつつ、届かない場合に備えて明示的な再送ボタンも出す。

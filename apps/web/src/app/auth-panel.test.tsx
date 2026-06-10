@@ -7,6 +7,7 @@ vi.mock("@/lib/auth-client", () => ({
   signIn: { email: vi.fn() },
   signUp: { email: vi.fn() },
   sendVerificationEmail: vi.fn(),
+  verifyEmailCallbackURL: () => "http://localhost:3000/verify-email",
 }));
 
 import { sendVerificationEmail, signIn, signUp } from "@/lib/auth-client";
@@ -51,6 +52,7 @@ test("サインインを送信すると signIn.email を呼ぶ（name は送ら�
   await user.type(screen.getByLabelText("パスワード"), "password123");
   await user.click(screen.getByRole("button", { name: "サインイン" }));
 
+  // サインインには callbackURL を渡さない（成功時リダイレクトを避けるため。auth-panel.tsx 参照）。
   expect(signIn.email).toHaveBeenCalledWith({
     email: "taro@example.com",
     password: "password123",

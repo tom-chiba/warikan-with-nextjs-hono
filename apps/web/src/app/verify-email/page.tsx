@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useState } from "react";
-import { sendVerificationEmail, useSession } from "@/lib/auth-client";
+import { sendVerificationEmail, verifyEmailCallbackURL } from "@/lib/auth-client";
 
 // 確認メール内リンクの遷移先（#69）。API がトークンを検証したのち、ここへリダイレクトする。
 // 検証成功時は autoSignInAfterVerification によりセッションが張られた状態で（クエリなしで）着地し、
@@ -39,7 +39,6 @@ function VerifyEmailFallback() {
 
 function VerifyEmailView() {
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
   // API は期限切れ・無効トークンを ?error=TOKEN_EXPIRED / ?error=INVALID_TOKEN で返す。
   const linkInvalid = searchParams.get("error") !== null;
 
@@ -55,15 +54,15 @@ function VerifyEmailView() {
     );
   }
 
-  // 検証成功。autoSignInAfterVerification により、ここに着いた時点でサインイン済み。
+  // 検証成功。autoSignInAfterVerification により、通常はここに着いた時点でサインイン済みなので
+  // 「アプリへ」でそのまま入れる（未サインインなら / がサインイン画面を出す）。
+  // セッション状態で文言を分岐すると SSR とクライアントで描画が食い違いハイドレーションエラーに
+  // なるため、文言・導線はセッションに依存させない。
   return (
     <VerifyEmailShell>
-      <p className="note-ok">
-        メールアドレスの確認が完了しました。
-        {session ? "そのままご利用いただけます。" : "サインインしてご利用ください。"}
-      </p>
+      <p className="note-ok">メールアドレスの確認が完了しました。</p>
       <Link href="/" className="btn btn-fill">
-        {session ? "アプリへ" : "サインインへ"}
+        アプリへ
       </Link>
     </VerifyEmailShell>
   );
@@ -80,10 +79,7 @@ function ResendForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await sendVerificationEmail({
-        email: email.trim(),
-        callbackURL: `${window.location.origin}/verify-email`,
-      });
+      await sendVerificationEmail({ email: email.trim(), callbackURL: verifyEmailCallbackURL() });
     } catch {
       // ネットワーク断等。中立表示を保つため握りつぶす。
     }

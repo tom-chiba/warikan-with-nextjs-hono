@@ -10,6 +10,7 @@ const { changeEmailMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth-client", () => ({
   authClient: { changeEmail: changeEmailMock },
+  verifyEmailCallbackURL: () => "http://localhost:3000/verify-email",
 }));
 
 import { EmailChangeForm } from "./email-change-form";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { sendVerificationEmail } from "@/lib/auth-client";
+import { sendVerificationEmail, verifyEmailCallbackURL } from "@/lib/auth-client";
 
 // サインアップ成功後（#69 の仮登録状態）の「確認メールを送信しました」表示と再送導線。
 // AuthPanel の外（親ページ）に置く理由: サインアップ成功で Better Auth がセッションを再取得し、
@@ -17,10 +17,7 @@ export function VerificationSentNotice({ email, onBack }: { email: string; onBac
     setResending(true);
     setResent(false);
     try {
-      await sendVerificationEmail({
-        email,
-        callbackURL: `${window.location.origin}/verify-email`,
-      });
+      await sendVerificationEmail({ email, callbackURL: verifyEmailCallbackURL() });
     } catch {
       // ネットワーク断等。中立表示を保つため握りつぶす。
     }

@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 vi.mock("@/lib/auth-client", () => ({
   sendVerificationEmail: vi.fn(),
+  verifyEmailCallbackURL: () => "http://localhost:3000/verify-email",
 }));
 
 import { sendVerificationEmail } from "@/lib/auth-client";

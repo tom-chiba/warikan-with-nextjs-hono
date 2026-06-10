@@ -1,11 +1,5 @@
+import { escapeHtmlAttribute } from "./html";
 import type { MailMessage } from "./index";
-
-// HTML 属性値（href）への埋め込み用の最小エスケープ。reset-password-email.ts と同じ理由で、
-// 将来クエリパラメータが増えて & が入っても属性が壊れない・属性インジェクションされないよう、
-// コメントの不変条件に頼らず境界で構造的にエスケープする。
-function escapeHtmlAttribute(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-}
 
 // サインアップ時のメールアドレス確認メールの文面（#69）。送信トリガーは auth.ts の
 // emailVerification.sendVerificationEmail から呼ぶ。reset-password-email.ts と同形。

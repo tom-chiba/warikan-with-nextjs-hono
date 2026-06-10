@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { authClient, verifyEmailCallbackURL } from "@/lib/auth-client";
 
 // 設定ページのメールアドレス行 + インライン変更フォーム（#61）。
 // 編集中フラグ・入力値・エラー/成功は行内の関心事なのでここに閉じ込め、
@@ -30,7 +30,7 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
         newEmail: input.trim(),
         // 確認リンク踏破後の着地先（#69）。検証済みユーザーの変更は新アドレス宛に
         // 確認リンクを送り、踏破時にこの /verify-email へ戻って変更が確定する。
-        callbackURL: `${window.location.origin}/verify-email`,
+        callbackURL: verifyEmailCallbackURL(),
       });
       if (res.error) {
         // 既存メールとの重複は自前の hooks.before が日本語 message で返すため、そのまま表示する。
