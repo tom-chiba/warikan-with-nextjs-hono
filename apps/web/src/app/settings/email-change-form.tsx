@@ -1,14 +1,12 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
-import { authClient } from "@/lib/auth-client";
+import { authClient, verifyEmailCallbackURL } from "@/lib/auth-client";
 
 // 設定ページのメールアドレス行 + インライン変更フォーム（#61）。
 // 編集中フラグ・入力値・エラー/成功は行内の関心事なのでここに閉じ込め、
 // ページ側は設定ハブの構成に集中させる（#64 の MemberRow と同じ方針）。
 export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
-  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -28,17 +26,24 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
     setError(null);
     setSubmitting(true);
     try {
-      const res = await authClient.changeEmail({ newEmail: input.trim() });
+      const res = await authClient.changeEmail({
+        newEmail: input.trim(),
+        // 確認リンク踏破後の着地先（#69）。検証済みユーザーの変更は新アドレス宛に
+        // 確認リンクを送り、踏破時にこの /verify-email へ戻って変更が確定する。
+        callbackURL: verifyEmailCallbackURL(),
+      });
       if (res.error) {
         // 既存メールとの重複は自前の hooks.before が日本語 message で返すため、そのまま表示する。
         setError(res.error.message ?? "メールアドレスの変更に失敗しました");
         return;
       }
-      // 成功時はセッション Cookie が新メールで更新され、useSession の自動再取得で
-      // 表示中のメールアドレスも更新される。メールはグループのメンバー一覧
-      //（["members", groupId] キャッシュ）にも表示されるため、全グループ分を無効化して
-      // 次回表示時に新メールへ揃える。フォームを閉じて成功メッセージを示す。
-      await queryClient.invalidateQueries({ queryKey: ["members"] });
+      // #69 でメール検証を導入したため、検証済みユーザーの変更は即時反映されず、
+      // 新しいアドレス宛に確認リンクが送られる。リンクを踏むまでメールは変わらないので、
+      // ここでは「確認メールを送った」ことだけを示す。変更は別ナビゲーション（新アドレスのリンク
+      //（/verify-email 着地）踏破）で確定するため、この時点ではメンバー一覧（["members"] キャッシュ）
+      // を無効化しない（変わっていない値で更新しても無意味）。変更確定後に各画面が再マウント・
+      // 再取得した時点で新メールに揃う。changeEmail の確認メール方式への正式対応
+      //（現メール承認・専用 UI・確定後のキャッシュ更新）は後続 Issue。
       setSuccess(true);
       setEditing(false);
     } catch {
@@ -72,7 +77,11 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
           </button>
         )}
       </div>
-      {success && <p className="note-ok">メールアドレスを変更しました</p>}
+      {success && (
+        <p className="note-ok">
+          確認メールを送信しました。新しいメールアドレス宛のリンクを開くと変更が完了します。
+        </p>
+      )}
       {editing && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <input
@@ -87,7 +96,10 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
             onChange={(e) => setInput(e.target.value)}
             className="field"
           />
-          <p className="note-muted">変更後は新しいメールアドレスでサインインします。</p>
+          <p className="note-muted">
+            新しいメールアドレスに確認メールを送ります。リンクを開くと変更が完了し、以後は新しい
+            メールアドレスでサインインします。
+          </p>
           {error && <p className="note-danger">{error}</p>}
           <div className="flex gap-2">
             <button

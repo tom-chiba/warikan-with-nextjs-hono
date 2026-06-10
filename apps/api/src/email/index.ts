@@ -21,14 +21,19 @@ export type MailMessage = {
 export type EmailSender = (message: MailMessage) => Promise<void>;
 
 // env からメール送信関数を組み立てる。
-// - RESEND_API_KEY があれば Resend で実送信する（本番）。
-// - なければ console 出力にフォールバックする（ローカル開発・テスト。実送信しない）。
-// - EMAIL_TEST_INBOX === "1" のときは、どちらのバックエンドでも送信内容をインメモリ受信箱に
-//   記録し、テスト（vitest / e2e）が /__test__/emails 経由で宛先・リンク URL を検証できるようにする。
-//   本番 wrangler.jsonc には EMAIL_TEST_INBOX を置かないため、受信箱は本番では無効。
+// - EMAIL_TEST_INBOX === "1" のときは実送信せず console 出力にフォールバックし、送信内容を
+//   インメモリ受信箱に記録する。テスト（vitest / e2e）が /__test__/emails 経由で宛先・リンク URL を
+//   検証できるようにするためで、本番 wrangler.jsonc には EMAIL_TEST_INBOX を置かないため無効。
+//   受信箱が有効なときに実送信「しない」のが重要: 開発者の .dev.vars に実 RESEND_API_KEY があっても、
+//   e2e のような並列サインアップで実 Resend のレート制限・失敗に左右されず（失敗すると送信後の受信箱
+//   記録に到達せず受信箱が空になる）、実アドレスへ誤送信もしない。#69 で全サインアップがメールを
+//   送るようになり、この決定性が一段と重要になった。
+// - 上記以外で RESEND_API_KEY があれば Resend で実送信する（本番）。
+// - どちらも無ければ console 出力にフォールバックする（ローカル開発。実送信しない）。
 export function createEmailSender(env: Env): EmailSender {
   const captureToInbox = env.EMAIL_TEST_INBOX === "1";
-  const apiKey = env.RESEND_API_KEY;
+  // 受信箱有効時は実送信しないため、実 Resend バックエンドは選ばない。
+  const apiKey = captureToInbox ? undefined : env.RESEND_API_KEY;
 
   let from: string;
   let backend: EmailSender;

@@ -1,17 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
+import { completeVerification, signUpAndVerify } from "./helpers/auth";
 
-// サインアップして設定ページを開く共通操作。
+// サインアップ（#69 の確認リンク踏破まで）して設定ページを開く共通操作。
 // 実行ごとに一意のメールにして「既に存在」を避ける（auth.spec.ts と同じパターン）。
 async function signUpAndOpenSettings(page: Page, email: string, password: string) {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill("E2E Settings User");
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill(password);
-  await page.getByRole("button", { name: "サインアップ" }).click();
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
-    timeout: 30_000,
-  });
+  await signUpAndVerify(page, { name: "E2E Settings User", email, password });
   await page.getByRole("link", { name: "設定" }).click();
 }
 
@@ -26,7 +19,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.getByRole("button", { name: "サインイン" }).click();
 }
 
-test("メールアドレスを変更すると表示が更新され、新しいメールでサインインできる", async ({
+test("メールアドレス変更は新アドレスの確認リンクで完了し、新しいメールでサインインできる", async ({
   page,
 }) => {
   const email = `e2e-ce-${Date.now()}@example.com`;
@@ -39,14 +32,20 @@ test("メールアドレスを変更すると表示が更新され、新しい�
   await page.getByLabel("新しいメールアドレス").fill(newEmail);
   await page.getByRole("button", { name: "保存" }).click();
 
-  // 成功メッセージが出て、セッション再取得により表示メールも新しい値になる。
-  await expect(page.getByText("メールアドレスを変更しました")).toBeVisible();
-  await expect(page.getByText(newEmail)).toBeVisible();
+  // #69: 検証済みユーザーの変更は即時反映されず、新アドレス宛に確認メールが送られる。
+  await expect(page.getByText(/確認メールを送信しました/)).toBeVisible();
+
+  // 新アドレスに届いた確認リンクを踏むと変更が確定する。
+  await completeVerification(page, newEmail);
 
   // 変更後のメールアドレスでサインインし直せる（受け入れ条件）。
+  // サインアウト導線は設定ハブにあるため設定へ移動する。
+  await page.goto("/settings");
   await signOut(page);
   await signIn(page, newEmail, password);
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
+    timeout: 30_000,
+  });
 });
 
 test("既存ユーザーのメールアドレスへは変更できずエラーが表示される", async ({ page }) => {

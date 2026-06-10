@@ -52,8 +52,11 @@ describe("パスワード再設定（#68）", () => {
     await clearEmails();
   });
 
+  // signUpAndGetCookie は #69 のサインアップ時確認メール（sendOnSignUp）を 1 通発生させる。
+  // 再設定メールだけを観測したいため、ユーザー作成後・再設定要求前に受信箱をクリアする。
   it("登録済みメールには再設定リンク付きメールが届く", async () => {
     await signUpAndGetCookie("rp-found@example.com");
+    await clearEmails();
 
     const res = await requestPasswordReset("rp-found@example.com");
     expect(res.status).toBe(200);
@@ -80,6 +83,7 @@ describe("パスワード再設定（#68）", () => {
 
   it("届いたトークンで新パスワードを設定でき、新パスワードでサインインできる", async () => {
     await signUpAndGetCookie("rp-reset@example.com");
+    await clearEmails();
     await requestPasswordReset("rp-reset@example.com");
     const token = extractToken((await listEmails())[0]);
 
@@ -92,6 +96,7 @@ describe("パスワード再設定（#68）", () => {
 
   it("再設定後は古いパスワードではサインインできない", async () => {
     await signUpAndGetCookie("rp-old@example.com");
+    await clearEmails();
     await requestPasswordReset("rp-old@example.com");
     const token = extractToken((await listEmails())[0]);
 
@@ -112,6 +117,7 @@ describe("パスワード再設定（#68）", () => {
       .all();
     expect(sessionsBefore.results.length).toBeGreaterThanOrEqual(2);
 
+    await clearEmails();
     await requestPasswordReset("rp-revoke@example.com");
     const token = extractToken((await listEmails())[0]);
     const res = await resetPassword(token, "new-password1234");
@@ -126,6 +132,7 @@ describe("パスワード再設定（#68）", () => {
 
   it("使用済みトークンでは再設定できない（INVALID_TOKEN）", async () => {
     await signUpAndGetCookie("rp-used@example.com");
+    await clearEmails();
     await requestPasswordReset("rp-used@example.com");
     const token = extractToken((await listEmails())[0]);
 
@@ -148,6 +155,7 @@ describe("パスワード再設定（#68）", () => {
 
   it("再設定リンク（GET）は有効なトークンを callbackURL に渡してリダイレクトする", async () => {
     await signUpAndGetCookie("rp-callback@example.com");
+    await clearEmails();
     await requestPasswordReset("rp-callback@example.com");
     const token = extractToken((await listEmails())[0]);
 

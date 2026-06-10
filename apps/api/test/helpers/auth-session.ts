@@ -15,23 +15,28 @@ function cookieHeaderFrom(res: Response, context: string): string {
   return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
 }
 
-// サインアップしてセッションクッキーを取得するテストヘルパー。
-// Better Auth はサインアップ成功時に Set-Cookie でセッションを発行するため、
-// その Cookie ヘッダ値をそのまま後続リクエストの `cookie` ヘッダに使う。
+// サインアップして検証済みにし、セッションクッキーを取得するテストヘルパー。
+// #69 で requireEmailVerification: true を有効化したため、サインアップ直後は emailVerified=false で
+// セッションも発行されず、未検証ユーザーのサインインは 403 になる。多数のテストは「認証済みユーザーの
+// Cookie」を前提とするため、ここではサインアップ後に D1 を直接更新して検証済みにし、サインインで
+// Cookie を取得する。確認メール送信〜リンク踏破の検証フロー自体は専用テスト（verify-email.test.ts /
+// e2e）で担保し、ここではそのコストとメール受信箱への依存を持ち込まない。
 export async function signUpAndGetCookie(
   email: string,
   password = "password1234",
   name = "Test User",
 ): Promise<string> {
-  const res = await SELF.fetch(`${BASE}/api/auth/sign-up/email`, {
+  const signUpRes = await SELF.fetch(`${BASE}/api/auth/sign-up/email`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password }),
   });
-  if (res.status !== 200) {
-    throw new Error(`sign-up failed: ${res.status}`);
+  if (signUpRes.status !== 200) {
+    throw new Error(`sign-up failed: ${signUpRes.status}`);
   }
-  return cookieHeaderFrom(res, "sign-up");
+  // メール検証を踏まずに検証済みへ更新する（テスト専用の近道）。
+  await env.DB.prepare("UPDATE user SET email_verified = 1 WHERE email = ?").bind(email).run();
+  return signInAndGetCookie(email, password);
 }
 
 // 既存ユーザーでサインインしてセッションクッキーを取得するテストヘルパー。

@@ -7,6 +7,7 @@ import * as schema from "./db/schema";
 import { group, groupMember, user } from "./db/schema";
 import { createEmailSender } from "./email";
 import { buildResetPasswordEmail } from "./email/reset-password-email";
+import { buildVerificationEmail } from "./email/verify-email";
 import { testPasswordHasher } from "./internal/test-password-hasher";
 
 // D1 バインディングや secret は実行時 env から渡るため、
@@ -26,6 +27,12 @@ export function createAuth(env: Env) {
     }),
     emailAndPassword: {
       enabled: true,
+      // サインアップ時にメールアドレスの確認（検証）を必須にする（#69）。有効時、未検証ユーザーの
+      // サインインは 403（EMAIL_NOT_VERIFIED）で弾かれ、emailVerification.sendOnSignIn により
+      // 確認メールが自動再送される。Web 側はこの 403 を「確認メールを再送しました」表示につなげる。
+      // 既存ユーザーは全員 emailVerified=false のため、これを単純に有効化するとロックアウトされる。
+      // drizzle/0007_backfill_email_verified.sql で既存ユーザーを検証済みにバックフィルしている。
+      requireEmailVerification: true,
       // パスワード再設定の完了時、そのユーザーの全セッション（他端末含む）を失効させる（#68）。
       // 再設定は「パスワードを忘れた／漏えいを疑う」文脈であり、change-password の
       // revokeOtherSessions: true（#61）と同じく既存セッションを残さない方が安全。
@@ -51,6 +58,31 @@ export function createAuth(env: Env) {
       // 本番 wrangler.jsonc には存在しないため常に undefined = scrypt のまま。
       // "0" や "false" の誤設定で有効化されないよう truthy 判定ではなく "1" と厳密比較する。
       ...(env.TEST_HASH === "1" ? { password: testPasswordHasher } : {}),
+    },
+    // サインアップ時のメールアドレス検証（#69）。requireEmailVerification: true と組み合わせ、
+    // 確認リンクを踏むまでサインインできない仮登録フローを実現する。
+    emailVerification: {
+      // 確認メールの送信。sendResetPassword（#68）と同じく createEmailSender(env) で得た送信関数に
+      // 検証リンク url を載せて呼ぶ。ここで例外を外へ漏らさないこと: sendOnSignIn の再送は未検証
+      // ユーザーのサインイン（403）に付随して走るため、送信失敗が応答へ伝播すると 403 が 500 に化け、
+      // メール存在有無による応答差にもつながりうる。Better Auth 本体も送信を try/catch するが、
+      // sendResetPassword と同様に内部実装へ依存せず自前でも握りつぶし、ログを自前の文言で残す。
+      sendVerificationEmail: async ({ user: targetUser, url }) => {
+        try {
+          const sendEmail = createEmailSender(env);
+          await sendEmail(buildVerificationEmail({ to: targetUser.email, url }));
+        } catch (err) {
+          console.error("メールアドレス確認メールの送信に失敗しました", err);
+        }
+      },
+      // サインアップ時に確認メールを自動送信する。
+      sendOnSignUp: true,
+      // 未検証ユーザーがサインインを試みるたびに確認メールを再送する。Web 側は 403 を受けて
+      // 「確認メールを再送しました」と案内でき、ユーザーは明示操作なしでも再送を受け取れる。
+      sendOnSignIn: true,
+      // 確認リンク踏破時にそのまま自動サインインさせ、ユーザーがアプリに入れるようにする。
+      // Web の /verify-email はこの自動サインイン済みセッション前提で完了表示する。
+      autoSignInAfterVerification: true,
     },
     hooks: {
       // Better Auth の /delete-user はパスワード未指定（空文字含む）だと fresh session
@@ -108,12 +140,14 @@ export function createAuth(env: Env) {
       }),
     },
     user: {
-      // メールアドレス変更（#61）。メール送信基盤が未整備のため確認メール方式は採れず、
-      // updateEmailWithoutVerification で即時変更する。これは現メールが未検証
-      //（emailVerified !== true）の場合のみ働くが、本アプリはメール検証自体が無く
-      // 全ユーザーが未検証のため、実質すべてのユーザーが即時変更となる。
-      // 将来メール検証を導入する際は emailVerification.sendVerificationEmail の実装と
-      // このオプションの見直しが必要（#61 の実装方針メモ参照）。
+      // メールアドレス変更（#61）。updateEmailWithoutVerification は現メールが未検証
+      //（emailVerified !== true）の場合のみ即時変更として働く。
+      // #69 でサインアップ時のメール検証を導入したため、今後の新規ユーザーと
+      // バックフィル済みの既存ユーザーはすべて emailVerified=true となり、このオプションは
+      // 実質無効化される（Better Auth 標準の「新メールへ確認リンク送付」フローに切り替わるが、
+      // emailVerification を実装済みの今は確認リンク方式が機能する）。
+      // ただし changeEmail を確認メール方式へ正式対応させる（変更先への確認導線・UI 整備）のは
+      // #69 のスコープ外で、後続 Issue とする（#69 の実装方針メモ「スコープ外」参照）。
       changeEmail: {
         enabled: true,
         updateEmailWithoutVerification: true,

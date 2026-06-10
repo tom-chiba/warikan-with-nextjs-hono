@@ -1,41 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
+import { API_ORIGIN, fetchResetUrl, signUpAndVerify } from "./helpers/auth";
 
-// API のオリジン。playwright.config の baseURL は web(:3000) を指すため、受信箱エンドポイント
-// /__test__/* を叩くには api(:8787) を直接指定する必要がある（webServer で api を :8787 に起動）。
-const API_ORIGIN = "http://localhost:8787";
-
-interface SentEmail {
-  to: string;
-  subject: string;
-  text?: string;
-  html?: string;
-}
-
-// サインアップしてログイン状態にする共通操作（auth.spec.ts と同じパターン）。
+// サインアップ（#69 の確認リンク踏破まで）してログイン状態にする共通操作。
 async function signUp(page: Page, email: string, password: string) {
-  await page.goto("/");
-  await page.getByRole("tab", { name: "サインアップ" }).click();
-  await page.getByLabel("名前").fill("E2E Reset User");
-  await page.getByLabel("メールアドレス").fill(email);
-  await page.getByLabel("パスワード").fill(password);
-  await page.getByRole("button", { name: "サインアップ" }).click();
-  await expect(page.getByRole("link", { name: "グループを作成" })).toBeVisible({
-    timeout: 30_000,
-  });
-}
-
-// 受信箱から指定宛先の最新メールの再設定リンク URL を取り出す。
-// メールは #70 のインメモリ受信箱（EMAIL_TEST_INBOX=1）に記録される。
-async function fetchResetUrl(page: Page, to: string): Promise<string> {
-  const res = await page.request.get(`${API_ORIGIN}/__test__/emails`);
-  expect(res.ok()).toBeTruthy();
-  const { emails } = (await res.json()) as { emails: SentEmail[] };
-  const mail = emails.findLast((e) => e.to === to);
-  expect(mail, `${to} 宛のメールが受信箱に無い`).toBeTruthy();
-  const body = mail?.text ?? mail?.html ?? "";
-  const match = body.match(/https?:\/\/[^\s"]+/);
-  expect(match, `再設定リンクがメール本文に無い: ${body}`).toBeTruthy();
-  return match?.[0] ?? "";
+  await signUpAndVerify(page, { name: "E2E Reset User", email, password });
 }
 
 test("パスワードを忘れたユーザーがメールのリンクから再設定し、新パスワードでサインインできる", async ({

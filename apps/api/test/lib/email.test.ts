@@ -22,6 +22,14 @@ describe("createEmailSender（#70）", () => {
     expect(() => createEmailSender(envOf({}))).not.toThrow();
   });
 
+  it("EMAIL_TEST_INBOX=1 なら RESEND_API_KEY があっても実送信せず（RESEND_FROM 不要で）生成できる", () => {
+    // 受信箱有効時は実 Resend を選ばないため、RESEND_FROM 欠如でも throw しない（console 経路）。
+    // これによりテスト/e2e は実 Resend のレート制限・失敗に左右されず受信箱記録に到達する（#69）。
+    expect(() =>
+      createEmailSender(envOf({ RESEND_API_KEY: "re_test", EMAIL_TEST_INBOX: "1" })),
+    ).not.toThrow();
+  });
+
   it("html / text がどちらも無いと送信時に throw する", async () => {
     const send = createEmailSender(envOf({}));
     await expect(send({ to: "a@example.com", subject: "件名" } as MailMessage)).rejects.toThrow(
