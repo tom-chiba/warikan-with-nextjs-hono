@@ -67,10 +67,10 @@ test("ログイン済みでグループが 1 件なら、トップページで�
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "E2E ホーム入力 に購入品を入力" })).toBeVisible();
 
-  // そのまま入力して保存までできる（等分で支払額と割勘金額を一致させる）。
+  // そのまま入力して保存までできる（等分はデフォルト ON のため、支払額を入れるだけで割勘金額が一致する #81）。
   await page.getByLabel("購入品名").fill("ランチ");
+  await expect(page.getByRole("checkbox")).toBeChecked();
   await page.getByLabel("Home User の支払額").fill("1000");
-  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "保存" }).click();
   await expect(page.getByText("保存しました。続けて入力できます。")).toBeVisible();
 });

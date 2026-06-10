@@ -103,6 +103,31 @@ test("既存値がフォームにプリフィルされる", async () => {
   expect(screen.getByLabelText("オーナー の支払額")).toHaveValue(1000);
 });
 
+test("編集時は等分が OFF で、手動調整済みの割勘金額が等分で上書きされない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 等分（500/500）とは異なる手動調整済みの割勘を持つアイテム。
+  itemGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      item: {
+        ...item.item,
+        shares: [
+          { userId: "owner", amount: 700 },
+          { userId: "friend", amount: 300 },
+        ],
+      },
+    }),
+  });
+  membersGetMock.mockResolvedValue({ ok: true, json: async () => members });
+
+  renderWithClient(<EditItemPage />);
+
+  await screen.findByDisplayValue("ランチ");
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  expect(screen.getByLabelText("オーナー の割勘金額")).toHaveValue(700);
+  expect(screen.getByLabelText("フレンド の割勘金額")).toHaveValue(300);
+});
+
 test("更新すると PUT が呼ばれ、一覧へ遷移する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemGetMock.mockResolvedValue({ ok: true, json: async () => item });

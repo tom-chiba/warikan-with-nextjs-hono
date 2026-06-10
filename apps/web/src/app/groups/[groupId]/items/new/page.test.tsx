@@ -71,15 +71,15 @@ test("未ログイン時はサインインへの導線を表示する", () => {
   expect(screen.getByText("サインインへ")).toBeInTheDocument();
 });
 
-test("等分スイッチ ON で支払額合計が割勘金額へ等分入力される", async () => {
+test("等分はデフォルト ON で、支払額を入力すると割勘金額へ等分入力される", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   setTwoMembers();
   renderWithClient(<NewItemPage />);
 
   const myPayment = await screen.findByLabelText("わたし の支払額");
+  expect(screen.getByRole("checkbox")).toBeChecked();
+  // 等分はデフォルト ON のため、支払額 1000 を入力するだけで 2 人へ 500 ずつ等分される（端数なしで決定的）。
   await userEvent.type(myPayment, "1000");
-  // 支払額入力後に等分 ON にすると、1000 を 2 人で 500 ずつ等分する（端数なしで決定的）。
-  await userEvent.click(screen.getByRole("checkbox"));
 
   expect(await screen.findByLabelText("わたし の割勘金額")).toHaveValue(500);
   expect(screen.getByLabelText("ともだち の割勘金額")).toHaveValue(500);
@@ -91,8 +91,7 @@ test("等分 ON 中に支払額を変更すると割勘が再追従する", asyn
   renderWithClient(<NewItemPage />);
 
   const myPayment = await screen.findByLabelText("わたし の支払額");
-  await userEvent.type(myPayment, "1000");
-  await userEvent.click(screen.getByRole("checkbox")); // 500/500
+  await userEvent.type(myPayment, "1000"); // 等分はデフォルト ON → 500/500
   expect(await screen.findByLabelText("わたし の割勘金額")).toHaveValue(500);
 
   // 等分 ON のまま支払額を 2000 へ変更 → 1000/1000 に追従する（effect ではなくイベントで再計算）。
@@ -107,7 +106,10 @@ test("割勘が支払額を超過しているとき「残りをここに」は�
   setTwoMembers();
   renderWithClient(<NewItemPage />);
 
-  await userEvent.type(await screen.findByLabelText("わたし の支払額"), "500");
+  // 等分（デフォルト ON）を OFF にし、割勘を手入力で超過させる。
+  const myPayment = await screen.findByLabelText("わたし の支払額");
+  await userEvent.click(screen.getByRole("checkbox"));
+  await userEvent.type(myPayment, "500");
   await userEvent.type(screen.getByLabelText("わたし の割勘金額"), "900"); // 超過（deficit < 0）
   const fillButtons = screen.getAllByRole("button", { name: "残りをここに" });
   expect(fillButtons[0]).toBeDisabled();
@@ -120,8 +122,7 @@ test("等分 ON 中に割勘を手入力するとスイッチが OFF になる",
 
   await userEvent.type(await screen.findByLabelText("わたし の支払額"), "1000");
   const toggle = screen.getByRole("checkbox");
-  await userEvent.click(toggle);
-  expect(toggle).toBeChecked();
+  expect(toggle).toBeChecked(); // デフォルト ON
 
   // 割勘を手入力 → 等分の意思を撤回したとみなしスイッチ自動 OFF。
   await userEvent.type(screen.getByLabelText("ともだち の割勘金額"), "1");
@@ -134,8 +135,10 @@ test("「残りをここに」で不足分が対象メンバーへ加算され�
   renderWithClient(<NewItemPage />);
 
   await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
+  // 等分（デフォルト ON）を OFF にしてから支払額を入力し、割勘未入力（合計 0）の状態を作る。
+  await userEvent.click(screen.getByRole("checkbox"));
   await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
-  // 割勘は未入力（合計 0）。不足 1000 をわたしの行に加算する。
+  // 不足 1000 をわたしの行に加算する。
   const fillButtons = screen.getAllByRole("button", { name: "残りをここに" });
   await userEvent.click(fillButtons[0]);
 
@@ -152,8 +155,7 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
 
   const nameInput = await screen.findByLabelText("購入品名");
   await userEvent.type(nameInput, "ランチ");
-  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
-  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000"); // 等分（デフォルト ON）→ 500/500
 
   await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
@@ -177,6 +179,26 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
   expect(screen.getByLabelText("購入品名")).toHaveValue("");
 });
 
+test("等分を OFF にして保存しても、リセット後は等分 ON に戻る", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  itemsPostMock.mockResolvedValue({ ok: true, json: async () => ({ id: "item1" }) });
+  renderWithClient(<NewItemPage />);
+
+  await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
+  // 等分を OFF にして手動で割勘を入力する（全額わたし）。
+  const toggle = screen.getByRole("checkbox");
+  await userEvent.click(toggle);
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
+  await userEvent.type(screen.getByLabelText("わたし の割勘金額"), "1000");
+
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  // 連続入力のリセット後はデフォルトの等分 ON に戻る。
+  expect(await screen.findByText("保存しました。続けて入力できます。")).toBeInTheDocument();
+  expect(toggle).toBeChecked();
+});
+
 test("保存時に 401 が返るとセッション切れメッセージを表示する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   setTwoMembers();
@@ -184,8 +206,7 @@ test("保存時に 401 が返るとセッション切れメッセージを表示
   renderWithClient(<NewItemPage />);
 
   await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
-  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
-  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000"); // 等分（デフォルト ON）→ 500/500
 
   await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
@@ -200,6 +221,8 @@ test("合計が一致しないと保存ボタンは無効", async () => {
   renderWithClient(<NewItemPage />);
 
   await userEvent.type(await screen.findByLabelText("購入品名"), "不一致");
+  // 等分（デフォルト ON）を OFF にして、合計が一致しない状態を手入力で作る。
+  await userEvent.click(screen.getByRole("checkbox"));
   await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
   await userEvent.type(screen.getByLabelText("わたし の割勘金額"), "900");
 

@@ -74,8 +74,7 @@ test("保存すると指定グループへ POST し、成功メッセージを�
   renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
 
   await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
-  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
-  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000"); // 等分（デフォルト ON）→ 500/500
 
   await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
@@ -111,8 +110,7 @@ test("保存時に 401 が返るとセッション切れメッセージを表示
   renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
 
   await userEvent.type(await screen.findByLabelText("購入品名"), "ランチ");
-  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000");
-  await userEvent.click(screen.getByRole("checkbox")); // 等分 → 500/500
+  await userEvent.type(screen.getByLabelText("わたし の支払額"), "1000"); // 等分（デフォルト ON）→ 500/500
 
   await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
