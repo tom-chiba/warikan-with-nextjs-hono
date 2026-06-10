@@ -6,16 +6,16 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
-import { useSession } from "@/lib/auth-client";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useGroups } from "@/lib/use-groups";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 import { GroupNameEditor } from "./group-name-editor";
 import { MemberRow } from "./member-row";
 
 export default function GroupPage() {
   const params = useParams<{ groupId: string }>();
   const groupId = params.groupId;
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);

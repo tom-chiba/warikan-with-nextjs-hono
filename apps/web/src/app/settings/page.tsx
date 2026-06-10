@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
-import { authClient, signOut, useSession } from "@/lib/auth-client";
+import { authClient, signOut } from "@/lib/auth-client";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 import { EmailChangeForm } from "./email-change-form";
 import { PasswordChangeForm } from "./password-change-form";
 
@@ -13,7 +14,7 @@ import { PasswordChangeForm } from "./password-change-form";
 // メールアドレス・パスワードの変更フォームは各コンポーネントに閉じている（#61）。
 // 削除は Better Auth の deleteUser（パスワード再入力方式）で行い、本人確認を伴う（#33）。
 export default function SettingsPage() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

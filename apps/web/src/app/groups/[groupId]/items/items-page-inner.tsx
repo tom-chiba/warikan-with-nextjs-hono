@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { MainNav } from "@/components/main-nav";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
-import { useSession } from "@/lib/auth-client";
 import { useMarkGroupViewed } from "@/lib/current-group";
 import { useGroups } from "@/lib/use-groups";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 import { SettledView } from "./settled-view";
 import { UnsettledView } from "./unsettled-view";
 
@@ -19,7 +19,7 @@ export function ItemsPageInner() {
   const searchParams = useSearchParams();
   // "settled" 以外の値（未指定・不正値）はすべて未精算ビューに倒す。
   const status = searchParams.get("status") === "settled" ? "settled" : "unsettled";
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
 
   // MainNav のグループ切替セレクタ表示用。queryKey ["groups"] は / と共有されるため、
   // キャッシュが温まっていれば追加の往復は発生しない。

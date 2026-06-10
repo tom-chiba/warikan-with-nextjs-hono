@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
-import { useSession } from "@/lib/auth-client";
 import { useGroups } from "@/lib/use-groups";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 
 export default function GroupsPage() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");

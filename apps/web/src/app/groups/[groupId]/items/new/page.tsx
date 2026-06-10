@@ -4,14 +4,14 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
-import { useSession } from "@/lib/auth-client";
 import { useGroupMembers } from "@/lib/use-group-members";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm, type ItemFormValues } from "../item-form";
 
 export default function NewItemPage() {
   const params = useParams<{ groupId: string }>();
   const groupId = params.groupId;
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
 
   // メンバー一覧（#7 の既存エンドポイント）。ログイン済みのときだけ取得する。
   const { data: membersData } = useGroupMembers(groupId, !!session);

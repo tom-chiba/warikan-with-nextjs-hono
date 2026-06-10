@@ -5,15 +5,15 @@ import { useState } from "react";
 import { MainNav } from "@/components/main-nav";
 import { SessionError, SessionPending } from "@/components/session-states";
 import { APP_NAME } from "@/lib/app-meta";
-import { useSession } from "@/lib/auth-client";
 import { resolveCurrentGroup } from "@/lib/current-group";
 import { useGroups } from "@/lib/use-groups";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 import { AuthPanel } from "./auth-panel";
 import { QuickItemEntry } from "./quick-item-entry";
 import { VerificationSentNotice } from "./verification-sent-notice";
 
 export default function Home() {
-  const { data: session, isPending, error, refetch } = useSession();
+  const { data: session, isPending, error, refetch } = useResolvedSession();
   // サインアップ成功（#69 の仮登録）で表示する確認メール案内。AuthPanel ではなくここで保持する理由は
   // VerificationSentNotice のコメント参照。サインアップ直後のセッション再取得（isPending）でも
   // 失われないよう、isPending 判定より前に評価する。

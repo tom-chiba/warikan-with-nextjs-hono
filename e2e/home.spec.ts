@@ -20,6 +20,33 @@ test("未ログインでトップページを開くとサインイン/サイン�
   await expect(page.getByRole("button", { name: "サインアップ" })).toBeVisible();
 });
 
+// #76: 未ログインでタブを切り替えて戻ると、入力途中のサインアップ値が消える回帰の防止。
+// better-auth は refetchOnWindowFocus でフォーカス復帰のたびにセッションを再取得し、未ログイン
+// （data === null）では isPending が true に戻る。useResolvedSession で一度解決したら保留に戻さない
+// ことで AuthPanel の再マウント（＝入力値の破棄）を防ぐ。
+test("未ログインでフォーカス再取得が起きてもサインアップ入力値が消えない（#76）", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("tab", { name: "サインアップ" }).click();
+
+  const email = `e2e-focus-${Date.now()}@example.com`;
+  await page.getByLabel("名前").fill("Focus User");
+  await page.getByLabel("メールアドレス").fill(email);
+  await page.getByLabel("パスワード").fill("password1234");
+
+  // タブ復帰によるセッション再取得を、visibilitychange イベントの dispatch で再現する
+  //（better-auth の focus-manager が visibilityState === "visible" で再取得を起動する）。
+  const sessionRefetch = page.waitForResponse((res) => res.url().includes("/api/auth/get-session"));
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await sessionRefetch;
+
+  // 再取得後も AuthPanel は再マウントされず、入力途中の値が保持される。
+  await expect(page.getByLabel("メールアドレス")).toHaveValue(email);
+  await expect(page.getByLabel("名前")).toHaveValue("Focus User");
+  await expect(page.getByLabel("パスワード")).toHaveValue("password1234");
+});
+
 // #45: ログイン済みユーザーがアプリを開いたら、ワンタップも挟まず購入品入力に到達できる。
 test("ログイン済みでグループが 1 件なら、トップページでそのまま購入品を入力できる", async ({
   page,

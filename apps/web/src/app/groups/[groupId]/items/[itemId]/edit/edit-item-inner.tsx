@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
-import { useSession } from "@/lib/auth-client";
 import { useGroupMembers } from "@/lib/use-group-members";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm, type ItemFormInitial, type ItemFormValues } from "../../item-form";
 
 // 購入品編集ページの本体。未精算・精算済のどちらのアイテムも編集できる（Issue #24）。
@@ -20,7 +20,7 @@ export function EditItemInner() {
   const from = searchParams.get("from") === "settled" ? "settled" : "unsettled";
   const listPath =
     from === "settled" ? `/groups/${groupId}/items?status=settled` : `/groups/${groupId}/items`;
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
 
