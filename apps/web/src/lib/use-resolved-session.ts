@@ -27,7 +27,12 @@ export function useResolvedSession() {
   const [resolvedOnce, setResolvedOnce] = useState(false);
   // render 中の条件付き setState で一度だけラッチする（React 公式推奨の「派生 state を覚える」
   // パターン）。effect 経由のカスケード再描画を避けつつ、解決した最初の render から反映できる。
-  if (!result.isPending && !resolvedOnce) {
+  //
+  // ラッチは「成功した解決」のみで張る（error が無いこと）。初回取得が失敗（5xx/ネットワーク断）
+  // した場合 better-auth は isPending を false にして error を立てるが、ここで latch すると再試行
+  // （refetch で isPending が true・error が null に戻る）の保留状態を握り潰し、ローディング/再試行
+  // 表示を出すべき page.tsx が !session に落ちてサインインフォームを出してしまう。
+  if (!result.isPending && !result.error && !resolvedOnce) {
     setResolvedOnce(true);
   }
   return {

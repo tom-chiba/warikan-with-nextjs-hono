@@ -29,6 +29,20 @@ test("一度解決したら、再取得で isPending が true に戻っても保
   expect(result.current.isPending).toBe(false);
 });
 
+test("初回取得が失敗（error あり）したら latch せず、再試行の保留状態を握り潰さない", () => {
+  // 初回取得失敗: better-auth は isPending を false にして error を立てる。
+  // ここで latch すると再試行のローディング/再試行表示が壊れるため、成功時のみ latch する。
+  useSessionMock.mockReturnValue({ data: null, isPending: false, error: { status: 500 } });
+  const { result, rerender } = renderHook(() => useResolvedSession());
+  // error はそのまま透過し、呼び出し側（page.tsx）が SessionError を出す。
+  expect(result.current.isPending).toBe(false);
+
+  // 再試行で better-auth は error を消し isPending を true にする。latch していなければ保留が維持される。
+  useSessionMock.mockReturnValue({ data: null, isPending: true, error: null });
+  rerender();
+  expect(result.current.isPending).toBe(true);
+});
+
 test("data・error・refetch は加工せず透過する", () => {
   const refetch = vi.fn();
   const session = { user: { id: "u1", email: "me@example.com" } };
