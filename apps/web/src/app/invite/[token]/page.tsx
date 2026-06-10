@@ -8,12 +8,12 @@ import { AuthPanel } from "@/app/auth-panel";
 import { VerificationSentNotice } from "@/app/verification-sent-notice";
 import { SessionPending } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
-import { useSession } from "@/lib/auth-client";
+import { useResolvedSession } from "@/lib/use-resolved-session";
 
 export default function InvitePage() {
   const params = useParams<{ token: string }>();
   const token = params.token;
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
