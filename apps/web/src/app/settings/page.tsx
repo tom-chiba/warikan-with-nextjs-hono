@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
@@ -8,6 +9,14 @@ import { authClient, signOut } from "@/lib/auth-client";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { EmailChangeForm } from "./email-change-form";
 import { PasswordChangeForm } from "./password-change-form";
+
+// パスキー管理 UI は @simplewebauthn/browser を含む重い passkey-client に依存するため、
+// next/dynamic（ssr:false）で遅延読み込みし、設定画面の初期バンドルから外す（CLAUDE.md の
+// パフォーマンス方針）。WebAuthn はクライアント専用 API のため ssr:false が必須。
+const PasskeySection = dynamic(() => import("./passkey-section").then((m) => m.PasskeySection), {
+  ssr: false,
+  loading: () => <p className="note-muted">パスキー設定を読み込み中…</p>,
+});
 
 // 設定ハブページ。日常動線から外したグループ管理への入り口と、アカウント情報・
 // サインアウト・危険操作ゾーン（アカウント削除）をここに集約する（#51）。
@@ -89,6 +98,8 @@ export default function SettingsPage() {
           サインアウト
         </button>
       </section>
+
+      <PasskeySection />
 
       <section className="flex w-full flex-col gap-3 border-2 border-danger p-4">
         <h2 className="section-title border-b-2 border-danger pb-1.5 text-danger">危険な操作</h2>

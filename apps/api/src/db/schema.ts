@@ -65,6 +65,41 @@ export const verification = sqliteTable("verification", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
 
+// Better Auth の passkey プラグイン（@better-auth/passkey）が要求するテーブル（#90）。
+// パスキー（WebAuthn credential）1 個 ↔ user 1 人は 1 対 1、user 1 人 ↔ passkey は 1 対多。
+// userId は user.id を CASCADE 参照し、退会時にパスキーも一緒に消える。
+// フィールド名（camelCase）は passkey プラグインの Passkey 型に厳密に一致させること
+//（credentialID の大文字 ID など）。列名は他テーブルと同じく snake_case とする。
+export const passkey = sqliteTable(
+  "passkey",
+  {
+    id: text("id").primaryKey(),
+    // 端末・認証器を見分けるための表示名（登録時に付与。未指定なら user.email/id にフォールバック）。
+    name: text("name"),
+    publicKey: text("public_key").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    // 認証器が発行する credential の識別子。サインイン時にこの値で行を引くため索引を張る。
+    credentialID: text("credential_id").notNull(),
+    // 署名カウンタ（リプレイ検出用）。検証のたびに更新される。
+    counter: integer("counter").notNull(),
+    deviceType: text("device_type").notNull(),
+    backedUp: integer("backed_up", { mode: "boolean" }).notNull(),
+    // 利用可能なトランスポート（"usb,nfc,ble,internal" 等のカンマ区切り文字列）。
+    transports: text("transports"),
+    // プラグインは作成時刻を渡すが、Passkey 型では optional 扱いのため null も許容しつつ既定値を持つ。
+    createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
+    // 認証器モデルを示す GUID（プライバシー保護端末は全 0 を返す）。管理 UI のラベル付けに使う。
+    aaguid: text("aaguid"),
+  },
+  // list-user-passkeys は userId で、サインイン時の照合は credentialID で引くため、双方に索引を張る。
+  (t) => [
+    index("passkey_user_id_idx").on(t.userId),
+    index("passkey_credential_id_idx").on(t.credentialID),
+  ],
+);
+
 // ── 割勘ドメインスキーマ ──────────────────────────────────────────────
 // id は text 主キー + crypto.randomUUID() を Workers ランタイムで生成する
 //（Better Auth の user 等は自前で id を生成するため $defaultFn を持たないが、
