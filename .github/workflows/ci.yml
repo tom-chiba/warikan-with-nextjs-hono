@@ -29,8 +29,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-      # 既知の脆弱性チェック（high 以上で失敗）。
-      - run: pnpm audit --audit-level=high
+  # 脆弱性の検知・更新は Dependabot（security updates / alerts）に任せ、
+  # CI では audit を行わない（.github/dependabot.yml 参照）。
 
   e2e:
     runs-on: ubuntu-latest
