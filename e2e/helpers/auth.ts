@@ -48,6 +48,11 @@ export function fetchResetUrl(page: Page, to: string): Promise<string> {
   return fetchEmailLink(page, to, /https?:\/\/[^\s"]+/);
 }
 
+// アカウント削除確認リンク URL（API の /api/auth/delete-user/callback?...）を取り出す（#78）。
+export function fetchDeleteAccountUrl(page: Page, to: string): Promise<string> {
+  return fetchEmailLink(page, to, /https?:\/\/[^\s"]+\/api\/auth\/delete-user\/callback\?[^\s"]+/);
+}
+
 // 現在開いているページ（トップ / 招待ページ等）のサインアップフォームを送信する。
 // #69 によりサインアップは仮登録となり、成功すると「確認メールを送信しました」表示に切り替わる。
 export async function submitSignUp(

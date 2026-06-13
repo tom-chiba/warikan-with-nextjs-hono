@@ -7,6 +7,7 @@ import { createDb } from "./db";
 import * as schema from "./db/schema";
 import { group, groupMember, user } from "./db/schema";
 import { createEmailSender } from "./email";
+import { buildDeleteAccountEmail } from "./email/delete-account-email";
 import { buildResetPasswordEmail } from "./email/reset-password-email";
 import { buildVerificationEmail } from "./email/verify-email";
 import { testPasswordHasher } from "./internal/test-password-hasher";
@@ -97,9 +98,6 @@ export function createAuth(env: Env) {
       // 本人確認は「パスワード再入力で即削除」（#33 / ADR-0011）のため、UI 任せにせず
       // サーバー側でもパスワード必須を強制する。
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path === "/delete-user" && !ctx.body?.password) {
-          throw new APIError("BAD_REQUEST", { message: "パスワードを入力してください" });
-        }
         // Better Auth の既定では name は存在チェックのみで、空文字・空白のみでも通る。
         // user.name は notNull かつメンバー一覧等にそのまま表示されるため（#60）、
         // クライアントの required だけに頼らずサーバー側でも空でないことを強制する。
@@ -169,10 +167,29 @@ export function createAuth(env: Env) {
       changeEmail: {
         enabled: true,
       },
-      // アカウント削除（退会）。パスワード再入力（authClient.deleteUser({ password })）で
-      // 本人確認して即削除する。メール送信基盤が未整備のため確認リンク方式は採らない（#33）。
+      // アカウント削除（退会）。確認メール内のリンクを踏むことで削除を実行する（#78）。#33 では
+      // メール送信基盤が未整備だったためパスワード再入力で即削除していたが、#70 で基盤が整い、
+      // 当初見送った確認リンク方式へ移行した。確認メールを挟むことで誤操作やセッション乗っ取り時の
+      // 即時削除を防げる。sendDeleteAccountVerification を設定すると Better Auth は /delete-user を
+      // 「即削除」ではなく「確認トークンを発行してメール送信」する経路に切り替える（password を渡しても
+      // この経路が優先される）。リンク（GET /delete-user/callback）は発行元と同一セッション前提で、
+      // 踏破時に下の afterDelete を含む削除処理が走り callbackURL（web の /account-deleted）へ戻る。
       deleteUser: {
         enabled: true,
+        // 確認リンクの有効期限（秒）。Better Auth 既定は 24h だが、パスワード再設定・メール検証リンク
+        //（約 1h）と揃え、乗っ取り時の悪用窓を最小化する。
+        deleteTokenExpiresIn: 3600,
+        // 削除確認メールの送信。sendResetPassword（#68）と同じく createEmailSender(env) で得た送信関数に
+        // 確認リンク url を載せて呼ぶだけ。ここで例外を外へ漏らさないこと: 送信は
+        // runInBackgroundOrAwait 経由で走るが、自前でも try/catch して握りつぶし、ログを自前の文言で残す。
+        sendDeleteAccountVerification: async ({ user: targetUser, url }) => {
+          try {
+            const sendEmail = createEmailSender(env);
+            await sendEmail(buildDeleteAccountEmail({ to: targetUser.email, url }));
+          } catch (err) {
+            console.error("アカウント削除確認メールの送信に失敗しました", err);
+          }
+        },
         // user 削除後の掃除。group_member は user.id への CASCADE で消えるため、
         // 「唯一メンバーだったグループ」がメンバー 0 人のまま残る。それをここで削除する
         //（メンバー削除 API の「最後の 1 人が抜けたらグループも消す」と同じ NOT EXISTS パターン）。

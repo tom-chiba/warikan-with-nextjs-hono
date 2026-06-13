@@ -1,5 +1,6 @@
 import { env, SELF } from "cloudflare:test";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { clearEmails, listEmails, type SentEmail } from "../helpers/email-inbox";
 import { getUserId, signUpAndGetCookie } from "../helpers/auth-session";
 import { addMember, createGroup } from "../helpers/group";
 
@@ -11,13 +12,56 @@ const BASE = env.BETTER_AUTH_URL;
 //（WEB_ORIGIN はカンマ区切りで複数指定できるため先頭を使う）。
 const WEB_ORIGIN = env.WEB_ORIGIN.split(",")[0];
 
-// Better Auth のアカウント削除エンドポイント（パスワード再入力方式）。
-function deleteUser(cookie: string, password = "password1234") {
+// 削除確認リンク踏破後の着地先。Web の /account-deleted（#78）。originCheck の対象になるため
+// trustedOrigins（= WEB_ORIGIN）配下にする。
+const CALLBACK_URL = `${WEB_ORIGIN}/account-deleted`;
+
+// アカウント削除を「要求」する（#78）。sendDeleteAccountVerification 設定により、即削除ではなく
+// 確認メールを送る経路に入る。レスポンスは 200 + { message: "Verification email sent" }。
+function requestDelete(cookie: string, callbackURL = CALLBACK_URL) {
   return SELF.fetch(`${BASE}/api/auth/delete-user`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie, origin: WEB_ORIGIN },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify({ callbackURL }),
   });
+}
+
+// 受信箱から指定宛先の最新メールに含まれる削除確認リンク URL を取り出す。
+// リンクは ${BASE}/api/auth/delete-user/callback?token=<token>&callbackURL=... の形。
+function extractDeleteUrl(email: SentEmail): string {
+  const body = email.text ?? email.html ?? "";
+  const match = body.match(/https?:\/\/[^\s"]+\/api\/auth\/delete-user\/callback\?[^\s"]+/);
+  if (!match) {
+    throw new Error(`delete link not found in email body: ${body}`);
+  }
+  return match[0];
+}
+
+async function latestEmailTo(to: string): Promise<SentEmail> {
+  const mail = (await listEmails()).findLast((e) => e.to === to);
+  if (!mail) {
+    throw new Error(`${to} 宛のメールが受信箱に無い`);
+  }
+  return mail;
+}
+
+// 削除確認リンク（GET）を踏む。発行元と同一セッション（cookie）前提で、成功すると
+// callbackURL へ 302 リダイレクトする。検証は呼び出し側に任せ、レスポンスを返す。
+function followDeleteLink(url: string, cookie: string) {
+  return SELF.fetch(url, { headers: { cookie }, redirect: "manual" });
+}
+
+// 要求 → 受信箱からリンク取得 → 踏破までの一式。削除が確定したレスポンス（302）を返す。
+async function deleteUserViaLink(cookie: string, email: string) {
+  const reqRes = await requestDelete(cookie);
+  expect(reqRes.status).toBe(200);
+  const url = extractDeleteUrl(await latestEmailTo(email));
+  return followDeleteLink(url, cookie);
+}
+
+async function userExists(userId: string): Promise<boolean> {
+  const row = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
+  return row !== null;
 }
 
 async function groupExists(groupId: string): Promise<boolean> {
@@ -25,16 +69,38 @@ async function groupExists(groupId: string): Promise<boolean> {
   return row !== null;
 }
 
-describe("POST /api/auth/delete-user（アカウント削除）", () => {
-  it("正しいパスワードでアカウントを削除でき、user とセッションが消える", async () => {
+describe("アカウント削除（確認メールのリンク方式 / #78）", () => {
+  // 受信箱はモジュールスコープで蓄積されるため、テスト間でクリアして独立性を保つ。
+  beforeEach(async () => {
+    await clearEmails();
+  });
+
+  it("削除を要求すると確認メールが届き、リンクを踏むまでは削除されない", async () => {
+    const cookie = await signUpAndGetCookie("du-request@example.com");
+    const userId = await getUserId(env.DB, "du-request@example.com");
+
+    const res = await requestDelete(cookie);
+
+    expect(res.status).toBe(200);
+    const body = await res.json<{ message?: string }>();
+    expect(body.message).toBe("Verification email sent");
+    // この時点では即削除されない（受け入れ条件）。
+    expect(await userExists(userId)).toBe(true);
+
+    const mail = await latestEmailTo("du-request@example.com");
+    expect(mail.subject).toContain("アカウント削除");
+    expect(extractDeleteUrl(mail)).toBeTruthy();
+  });
+
+  it("確認リンクを踏むと user とセッションが消え、callbackURL へ戻る", async () => {
     const cookie = await signUpAndGetCookie("du-basic@example.com");
     const userId = await getUserId(env.DB, "du-basic@example.com");
 
-    const res = await deleteUser(cookie);
+    const res = await deleteUserViaLink(cookie, "du-basic@example.com");
 
-    expect(res.status).toBe(200);
-    const user = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
-    expect(user).toBeNull();
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe(CALLBACK_URL);
+    expect(await userExists(userId)).toBe(false);
     const session = await env.DB.prepare("SELECT id FROM session WHERE user_id = ?")
       .bind(userId)
       .first();
@@ -45,9 +111,9 @@ describe("POST /api/auth/delete-user（アカウント削除）", () => {
     const cookie = await signUpAndGetCookie("du-solo@example.com");
     const groupId = await createGroup(cookie, "ひとりグループ");
 
-    const res = await deleteUser(cookie);
+    const res = await deleteUserViaLink(cookie, "du-solo@example.com");
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
     expect(await groupExists(groupId)).toBe(false);
   });
 
@@ -58,9 +124,9 @@ describe("POST /api/auth/delete-user（アカウント削除）", () => {
     const groupId = await createGroup(ownerCookie, "残るグループ");
     await addMember(groupId, memberId);
 
-    const res = await deleteUser(ownerCookie);
+    const res = await deleteUserViaLink(ownerCookie, "du-owner@example.com");
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
     expect(await groupExists(groupId)).toBe(true);
     const members = await env.DB.prepare("SELECT user_id FROM group_member WHERE group_id = ?")
       .bind(groupId)
@@ -76,9 +142,9 @@ describe("POST /api/auth/delete-user（アカウント削除）", () => {
     const sharedGroupId = await createGroup(cookie, "ふたり");
     await addMember(sharedGroupId, otherId);
 
-    const res = await deleteUser(cookie);
+    const res = await deleteUserViaLink(cookie, "du-mixed@example.com");
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
     expect(await groupExists(soloGroupId)).toBe(false);
     expect(await groupExists(sharedGroupId)).toBe(true);
   });
@@ -107,9 +173,9 @@ describe("POST /api/auth/delete-user（アカウント削除）", () => {
       .bind(itemId, ownerId, 500, itemId, memberId, 500)
       .run();
 
-    const res = await deleteUser(ownerCookie);
+    const res = await deleteUserViaLink(ownerCookie, "du-cascade@example.com");
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(302);
     // item 自体は残るが、削除した owner の支払・負担行は消える（残メンバーの負担行は残る）。
     const item = await env.DB.prepare("SELECT id FROM item WHERE id = ?").bind(itemId).first();
     expect(item).not.toBeNull();
@@ -123,50 +189,40 @@ describe("POST /api/auth/delete-user（アカウント削除）", () => {
     expect(shares.results.map((s) => s.user_id)).toEqual([memberId]);
   });
 
-  // Better Auth はパスワード未指定だと fresh session での削除にフォールバックするが、
-  // 本人確認をパスワード再入力で強制するため hooks.before で 400 にしている（ADR-0011）。
-  it("パスワード未指定では fresh session でも削除されない", async () => {
-    const cookie = await signUpAndGetCookie("du-no-password@example.com");
-    const userId = await getUserId(env.DB, "du-no-password@example.com");
+  it("無効なトークンのリンクでは削除されない", async () => {
+    const cookie = await signUpAndGetCookie("du-invalid-token@example.com");
+    const userId = await getUserId(env.DB, "du-invalid-token@example.com");
+    // 確認メールを送らせたうえで、明らかに無効なトークンで踏む。
+    await requestDelete(cookie);
 
+    const res = await followDeleteLink(
+      `${BASE}/api/auth/delete-user/callback?token=obviously-invalid&callbackURL=${encodeURIComponent(CALLBACK_URL)}`,
+      cookie,
+    );
+
+    // 無効トークンはリダイレクトせず NOT_FOUND を返し、削除も実行されない（受け入れ条件）。
+    expect(res.status).toBe(404);
+    expect(await userExists(userId)).toBe(true);
+  });
+
+  it("未ログインのままリンクを踏んでも削除されない", async () => {
+    const cookie = await signUpAndGetCookie("du-no-session@example.com");
+    const userId = await getUserId(env.DB, "du-no-session@example.com");
+    await requestDelete(cookie);
+    const url = extractDeleteUrl(await latestEmailTo("du-no-session@example.com"));
+
+    // cookie を付けずに踏む。コールバックはセッション必須のため削除されない。
+    const res = await SELF.fetch(url, { redirect: "manual" });
+
+    expect(res.status).not.toBe(302);
+    expect(await userExists(userId)).toBe(true);
+  });
+
+  it("未ログインでは削除を要求できない（401）", async () => {
     const res = await SELF.fetch(`${BASE}/api/auth/delete-user`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", cookie, origin: WEB_ORIGIN },
-      body: JSON.stringify({}),
-    });
-
-    expect(res.status).toBe(400);
-    const user = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
-    expect(user).not.toBeNull();
-  });
-
-  it("空文字のパスワードでも削除されない", async () => {
-    const cookie = await signUpAndGetCookie("du-empty-password@example.com");
-    const userId = await getUserId(env.DB, "du-empty-password@example.com");
-
-    const res = await deleteUser(cookie, "");
-
-    expect(res.status).toBe(400);
-    const user = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
-    expect(user).not.toBeNull();
-  });
-
-  it("誤ったパスワードでは削除されない", async () => {
-    const cookie = await signUpAndGetCookie("du-wrong@example.com");
-    const userId = await getUserId(env.DB, "du-wrong@example.com");
-
-    const res = await deleteUser(cookie, "wrong-password");
-
-    expect(res.status).toBe(400);
-    const user = await env.DB.prepare("SELECT id FROM user WHERE id = ?").bind(userId).first();
-    expect(user).not.toBeNull();
-  });
-
-  it("未ログインでは削除できない（401）", async () => {
-    const res = await SELF.fetch(`${BASE}/api/auth/delete-user`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: "password1234" }),
+      headers: { "Content-Type": "application/json", origin: WEB_ORIGIN },
+      body: JSON.stringify({ callbackURL: CALLBACK_URL }),
     });
     expect(res.status).toBe(401);
   });
