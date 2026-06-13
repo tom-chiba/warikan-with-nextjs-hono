@@ -126,6 +126,24 @@ test("送信に失敗するとエラーメッセージを表示しボタンが�
   expect(screen.getByRole("button", { name: "アカウント削除の確認メールを送る" })).toBeEnabled();
 });
 
+test("送信成功後に再送が失敗すると、成功バナーを畳んでエラーだけを表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 1 回目は成功、2 回目（再送）は失敗を返す。
+  deleteUserMock
+    .mockResolvedValueOnce({ error: null })
+    .mockResolvedValueOnce({ error: { message: "送信できませんでした" } });
+
+  renderWithClient(<SettingsPage />);
+  await requestDelete();
+  await waitFor(() => expect(screen.getByText(/確認メールを送信しました/)).toBeInTheDocument());
+
+  await userEvent.click(screen.getByRole("button", { name: "確認メールを再送する" }));
+
+  // 失敗後は成功バナーが消え、エラーのみが残る（緑と赤の同時表示を避ける）。
+  await waitFor(() => expect(screen.getByText("送信できませんでした")).toBeInTheDocument());
+  expect(screen.queryByText(/確認メールを送信しました/)).not.toBeInTheDocument();
+});
+
 test("ネットワークエラー時もエラーメッセージを表示しボタンが再度有効になる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   deleteUserMock.mockRejectedValue(new TypeError("Failed to fetch"));

@@ -42,12 +42,16 @@ export default function SettingsPage() {
       // 発行元と同一セッション前提のため、送信後もサインアウトせずそのまま開いてもらう。
       const res = await authClient.deleteUser({ callbackURL: deleteAccountCallbackURL() });
       if (res.error) {
+        // 再送（sent=true）が失敗したときに成功バナーを残すと、緑の「送信しました」と赤の
+        // エラーが同時に出て紛らわしい。失敗時は sent を畳んでエラーだけを示す。
+        setSent(false);
         setError(res.error.message ?? "確認メールの送信に失敗しました");
         return;
       }
       setSent(true);
     } catch {
       // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
+      setSent(false);
       setError("確認メールの送信に失敗しました");
     } finally {
       setSubmitting(false);
