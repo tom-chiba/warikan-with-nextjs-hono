@@ -38,7 +38,7 @@ npm エコシステムでは、パッケージの乗っ取りや悪性バージ�
 
 - `pnpm-lock.yaml` をコミットする。
 - CI では `pnpm install --frozen-lockfile` を用いる。
-- `pnpm audit` を CI に組み込む。
+- 既知の脆弱性の検知・更新は Dependabot（security updates / alerts）に任せる（`.github/dependabot.yml`）。当初は `pnpm audit` を CI に組み込んでいたが、検知して落とすだけで更新は手動対応となり CI を不要にブロックしていたため廃止した。Dependabot は検知に加えて更新 PR を自動で立てるため、検知から修正までの時間を短縮できる。
 
 ### Consequences
 

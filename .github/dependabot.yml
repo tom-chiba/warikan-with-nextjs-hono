@@ -1,0 +1,40 @@
+version: 2
+updates:
+  # npm（pnpm）依存の更新。ルートと各 workspace をまとめて対象にする。
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/apps/*"
+      - "/packages/*"
+    schedule:
+      interval: weekly
+    # PR 乱立を抑えるため関連更新をグループ化する。
+    groups:
+      # patch/minor はまとめて 1 PR にする（破壊的変更が少なく確認が軽い）。
+      production-minor-patch:
+        applies-to: version-updates
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+      development-minor-patch:
+        applies-to: version-updates
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # 脆弱性ベースの更新もまとめる。
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+
+  # GitHub Actions の更新。
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
