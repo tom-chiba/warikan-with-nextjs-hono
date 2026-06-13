@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
-import { authClient, signOut } from "@/lib/auth-client";
+import { authClient, deleteAccountCallbackURL, signOut } from "@/lib/auth-client";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { EmailChangeForm } from "./email-change-form";
 import { PasswordChangeForm } from "./password-change-form";
@@ -21,45 +21,38 @@ const PasskeySection = dynamic(() => import("./passkey-section").then((m) => m.P
 // 設定ハブページ。日常動線から外したグループ管理への入り口と、アカウント情報・
 // サインアウト・危険操作ゾーン（アカウント削除）をここに集約する（#51）。
 // メールアドレス・パスワードの変更フォームは各コンポーネントに閉じている（#61）。
-// 削除は Better Auth の deleteUser（パスワード再入力方式）で行い、本人確認を伴う（#33）。
+// 削除は Better Auth の deleteUser（確認メールのリンク方式）で行う。送信後、メール内リンクの
+// 踏破で削除が確定する（#78）。
 export default function SettingsPage() {
   const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
 
   if (isPending) return <SessionPending />;
   if (!session) return <SignInPrompt message="設定を利用するにはサインインが必要です。" />;
 
-  async function handleDelete(e: FormEvent) {
+  async function handleRequestDelete(e: FormEvent) {
     e.preventDefault();
-    if (
-      !window.confirm(
-        "アカウントを削除します。あなただけが参加しているグループと、各グループでのあなたの支払・負担記録も削除されます。この操作は取り消せません。よろしいですか？",
-      )
-    ) {
-      return;
-    }
     setError(null);
     setSubmitting(true);
     try {
-      const res = await authClient.deleteUser({ password });
+      // #78: パスワード即削除ではなく、確認メールを送る。踏破リンク（/account-deleted 着地）は
+      // 発行元と同一セッション前提のため、送信後もサインアウトせずそのまま開いてもらう。
+      const res = await authClient.deleteUser({ callbackURL: deleteAccountCallbackURL() });
       if (res.error) {
-        // Better Auth 本体のエラーメッセージは英語のため、UI で起きうる誤パスワードは
-        // コードから日本語にマップする。自前の hooks.before は日本語 message をそのまま使う。
-        setError(
-          res.error.code === "INVALID_PASSWORD"
-            ? "パスワードが正しくありません"
-            : (res.error.message ?? "アカウントの削除に失敗しました"),
-        );
+        // 再送（sent=true）が失敗したときに成功バナーを残すと、緑の「送信しました」と赤の
+        // エラーが同時に出て紛らわしい。失敗時は sent を畳んでエラーだけを示す。
+        setSent(false);
+        setError(res.error.message ?? "確認メールの送信に失敗しました");
         return;
       }
-      // 削除成功時はセッションも無効化済みのため、ホーム（サインイン画面）へ戻す。
-      router.push("/");
+      setSent(true);
     } catch {
       // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
-      setError("アカウントの削除に失敗しました");
+      setSent(false);
+      setError("確認メールの送信に失敗しました");
     } finally {
       setSubmitting(false);
     }
@@ -106,23 +99,22 @@ export default function SettingsPage() {
         <p className="note-muted">
           アカウントを削除（退会）します。あなただけが参加しているグループは削除され、他のメンバーが残るグループでもあなたの支払・負担記録は削除されます。この操作は取り消せません。
         </p>
-        <form onSubmit={handleDelete} className="flex flex-col gap-3">
-          <input
-            type="password"
-            aria-label="確認用パスワード"
-            placeholder="パスワードを入力して確認"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="field"
-          />
+        {sent && (
+          <p className="note-ok">
+            確認メールを送信しました。同じブラウザでメール内のリンクを開くと削除が完了します（リンクの有効期限は約1時間です）。サインアウトせずにお待ちください。
+          </p>
+        )}
+        <form onSubmit={handleRequestDelete} className="flex flex-col gap-3">
+          {/* 送信後も再送できるようにする。リンクは約1時間で失効し、メールが届かない場合の
+              復帰導線が無いと詰まるため、sent 状態でも案内文を「再送」に切り替えてボタンを残す。 */}
+          <p className="note-muted">
+            {sent
+              ? "メールが届かない場合は、もう一度押すと確認メールを再送できます。"
+              : "下のボタンを押すと確認メールを送信します。メール内のリンクを開くまで削除は実行されません。"}
+          </p>
           {error && <p className="note-danger">{error}</p>}
-          <button
-            type="submit"
-            disabled={submitting || password.length === 0}
-            className="btn btn-fill-danger"
-          >
-            アカウントを削除
+          <button type="submit" disabled={submitting} className="btn btn-fill-danger">
+            {sent ? "確認メールを再送する" : "アカウント削除の確認メールを送る"}
           </button>
         </form>
       </section>

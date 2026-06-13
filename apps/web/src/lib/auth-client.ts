@@ -23,3 +23,10 @@ export function refreshSession(): void {
 export function verifyEmailCallbackURL(): string {
   return `${window.location.origin}/verify-email`;
 }
+
+// アカウント削除確認リンク踏破後の着地先（#78）。確認メールの url は
+// ${API}/api/auth/delete-user/callback?token=...&callbackURL=<ここ> の形になり、API が削除を実行した
+// のちこの /account-deleted に着地して完了表示する（クライアント実行時のみ呼ぶこと。window 参照のため）。
+export function deleteAccountCallbackURL(): string {
+  return `${window.location.origin}/account-deleted`;
+}

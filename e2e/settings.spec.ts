@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { completeVerification, signUpAndVerify } from "./helpers/auth";
+import { completeVerification, fetchDeleteAccountUrl, signUpAndVerify } from "./helpers/auth";
 
 // サインアップ（#69 の確認リンク踏破まで）して設定ページを開く共通操作。
 // 実行ごとに一意のメールにして「既に存在」を避ける（auth.spec.ts と同じパターン）。
@@ -96,4 +96,49 @@ test("現在のパスワードが誤っているとエラーが表示される",
   await page.getByRole("button", { name: "保存" }).click();
 
   await expect(page.getByText("現在のパスワードが正しくありません")).toBeVisible();
+});
+
+test("アカウント削除は確認メールのリンク踏破で完了し、以後サインインできない（#78）", async ({
+  page,
+}) => {
+  const email = `e2e-del-${Date.now()}@example.com`;
+  const password = "password1234";
+
+  await signUpAndOpenSettings(page, email, password);
+
+  // 確認メールを要求する。即削除されず「送信しました」案内に切り替わる。
+  await page.getByRole("button", { name: "アカウント削除の確認メールを送る" }).click();
+  await expect(page.getByText(/確認メールを送信しました/)).toBeVisible();
+
+  // メール内リンク（同一セッション前提）を踏むと削除が確定し、/account-deleted へ着地する。
+  const deleteUrl = await fetchDeleteAccountUrl(page, email);
+  await page.goto(deleteUrl);
+  await expect(
+    page.getByText("アカウントを削除しました。ご利用ありがとうございました。"),
+  ).toBeVisible({ timeout: 30_000 });
+
+  // 削除後は同じ資格情報でサインインしても認証エリアに入れない（受け入れ条件: 削除された）。
+  await page.goto("/");
+  await signIn(page, email, password);
+  await expect(page.getByRole("link", { name: "グループを作成" })).toHaveCount(0);
+});
+
+test("削除確認リンクが無効・期限切れだと削除されない（#78）", async ({ page }) => {
+  const email = `e2e-del-invalid-${Date.now()}@example.com`;
+  const password = "password1234";
+
+  await signUpAndOpenSettings(page, email, password);
+  await page.getByRole("button", { name: "アカウント削除の確認メールを送る" }).click();
+  await expect(page.getByText(/確認メールを送信しました/)).toBeVisible();
+
+  // 正規リンクからトークンだけを無効値に差し替えて踏む。API はリダイレクトせずエラーを返し、削除しない。
+  const deleteUrl = await fetchDeleteAccountUrl(page, email);
+  const tampered = deleteUrl.replace(/token=[^&]+/, "token=obviously-invalid");
+  await page.goto(tampered);
+
+  // 削除されていないので、設定ページにアクセスでき、危険操作ゾーンが見える（＝まだログイン中）。
+  await page.goto("/settings");
+  await expect(
+    page.getByRole("button", { name: "アカウント削除の確認メールを送る" }),
+  ).toBeVisible();
 });

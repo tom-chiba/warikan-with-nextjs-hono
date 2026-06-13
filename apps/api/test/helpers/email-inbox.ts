@@ -24,3 +24,14 @@ export async function listEmails(): Promise<SentEmail[]> {
 export function clearEmails(): Promise<Response> {
   return SELF.fetch(`${BASE}/__test__/emails`, { method: "DELETE" });
 }
+
+// 受信箱から指定宛先の最新メールを取り出す（listEmails は送信順のため findLast で最新）。
+// 宛先は実行ごとに一意のため、クリアしなくても他テストのメールと混ざらない前提で使う。
+// verify-email / change-email / delete-user の各テストで共通利用する。
+export async function latestEmailTo(to: string): Promise<SentEmail> {
+  const mail = (await listEmails()).findLast((e) => e.to === to);
+  if (!mail) {
+    throw new Error(`${to} 宛のメールが受信箱に無い`);
+  }
+  return mail;
+}

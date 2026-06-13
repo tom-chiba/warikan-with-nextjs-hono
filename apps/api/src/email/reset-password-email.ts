@@ -8,7 +8,7 @@ import type { MailMessage } from "./index";
 //（${BETTER_AUTH_URL}/api/auth/reset-password/:token?callbackURL=<web の /reset-password>）。
 // これを踏むと API がトークンを検証し、Web の /reset-password へ ?token= 付きでリダイレクトする。
 export function buildResetPasswordEmail({ to, url }: { to: string; url: string }): MailMessage {
-  // サービス名は test-email.ts の件名と同じく "warikan"。API 側に共有定数は無いため直書きする。
+  // サービス名は "warikan"。API 側に共有定数は無いため直書きする。
   const subject = "【warikan】パスワード再設定のご案内";
   const text = [
     "パスワード再設定のリクエストを受け付けました。",

@@ -1,7 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { signUpAndGetCookie } from "../helpers/auth-session";
-import { clearEmails, listEmails } from "../helpers/email-inbox";
+import { clearEmails, latestEmailTo } from "../helpers/email-inbox";
 
 const BASE = env.BETTER_AUTH_URL;
 
@@ -39,9 +39,8 @@ async function getDbEmail(originalOrNewEmail: string): Promise<string | null> {
 // 新アドレス宛に確認リンクを送る（Better Auth の change-email-verification フロー）。
 // リンクを踏むと email が新アドレスへ更新され、callbackURL("/") へ 302 リダイレクトする。
 async function completeEmailChange(cookie: string, to: string) {
-  const mail = (await listEmails()).findLast((e) => e.to === to);
-  expect(mail, `${to} 宛の確認メールが受信箱に無い`).toBeTruthy();
-  const body = mail?.text ?? mail?.html ?? "";
+  const mail = await latestEmailTo(to);
+  const body = mail.text ?? mail.html ?? "";
   const match = body.match(/https?:\/\/[^\s"]+/);
   expect(match, `確認リンクがメール本文に無い: ${body}`).toBeTruthy();
   // 同じブラウザ（cookie）でリンクを踏む想定。session.user.email が変更前メールと一致するため

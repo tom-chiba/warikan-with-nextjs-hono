@@ -1,22 +1,23 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { renderWithClient } from "@/test/render-with-client";
 
 // auth-client と next/navigation をモックする。vi.hoisted で巻き上げ順の問題を回避する。
 // changeEmail / changePassword の送信はコンポーネントテスト側で検証するため、
 // ここではモックしない（ページテストはボタン表示の確認までしか行わない）。
-const { useSessionMock, deleteUserMock, signOutMock, pushMock, confirmMock } = vi.hoisted(() => ({
+const { useSessionMock, deleteUserMock, signOutMock, pushMock } = vi.hoisted(() => ({
   useSessionMock: vi.fn(),
   deleteUserMock: vi.fn(),
   signOutMock: vi.fn(),
   pushMock: vi.fn(),
-  confirmMock: vi.fn(),
 }));
 
 vi.mock("@/lib/auth-client", () => ({
   useSession: () => useSessionMock(),
   signOut: (...args: unknown[]) => signOutMock(...args),
+  // #78: 削除は確認メールのリンク方式。callbackURL に着地先を渡して送信する。
+  deleteAccountCallbackURL: () => "http://localhost:3000/account-deleted",
   authClient: { deleteUser: deleteUserMock },
 }));
 vi.mock("next/navigation", () => ({
@@ -24,14 +25,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 import SettingsPage from "./page";
-
-Object.defineProperty(window, "confirm", { value: confirmMock, configurable: true });
-
-// confirm は既定で「承認」とし、キャンセルを検証するテストだけ false に上書きする
-//（groups/[groupId]/page.test.tsx と同じパターン）。
-beforeEach(() => {
-  confirmMock.mockReturnValue(true);
-});
 
 afterEach(() => {
   cleanup();
@@ -43,10 +36,9 @@ const loggedIn = {
   isPending: false,
 };
 
-// パスワードを入力して「アカウントを削除」を押す共通操作。
-async function submitDelete(password = "password1234") {
-  await userEvent.type(screen.getByLabelText("確認用パスワード"), password);
-  await userEvent.click(screen.getByRole("button", { name: "アカウントを削除" }));
+// 「アカウント削除の確認メールを送る」を押す共通操作（#78）。
+async function requestDelete() {
+  await userEvent.click(screen.getByRole("button", { name: "アカウント削除の確認メールを送る" }));
 }
 
 test("セッション確認中はローディングを表示する", () => {
@@ -106,61 +98,50 @@ test("サインアウトするとホームへ遷移する", async () => {
   await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
 });
 
-test("パスワード未入力では削除ボタンが無効になる", () => {
-  useSessionMock.mockReturnValue(loggedIn);
-
-  renderWithClient(<SettingsPage />);
-
-  expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeDisabled();
-});
-
-test("confirm でキャンセルすると deleteUser を呼ばない", async () => {
-  useSessionMock.mockReturnValue(loggedIn);
-  confirmMock.mockReturnValue(false);
-
-  renderWithClient(<SettingsPage />);
-  await submitDelete();
-
-  expect(confirmMock).toHaveBeenCalled();
-  expect(deleteUserMock).not.toHaveBeenCalled();
-});
-
-test("削除に成功するとホームへ遷移する", async () => {
+test("確認メールの送信に成功すると案内を表示し、callbackURL 付きで deleteUser を呼ぶ", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   deleteUserMock.mockResolvedValue({ error: null });
 
   renderWithClient(<SettingsPage />);
-  await submitDelete();
+  await requestDelete();
 
-  expect(deleteUserMock).toHaveBeenCalledWith({ password: "password1234" });
-  await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
-});
-
-test("誤パスワードでは日本語のエラーメッセージを表示し遷移しない", async () => {
-  useSessionMock.mockReturnValue(loggedIn);
-  // Better Auth 本体のエラーは英語 message + code で返る（実レスポンスと同形）。
-  deleteUserMock.mockResolvedValue({
-    error: { code: "INVALID_PASSWORD", message: "Invalid password" },
+  expect(deleteUserMock).toHaveBeenCalledWith({
+    callbackURL: "http://localhost:3000/account-deleted",
   });
-
-  renderWithClient(<SettingsPage />);
-  await submitDelete("wrong-password");
-
-  await waitFor(() => expect(screen.getByText("パスワードが正しくありません")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText(/確認メールを送信しました/)).toBeInTheDocument());
+  // 送信後は即削除されない（リンク踏破で確定）ため、ホームへの遷移は起こさない。
   expect(pushMock).not.toHaveBeenCalled();
-  // 失敗後は再入力して再試行できる（ボタンが再度有効になる）。
-  expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeEnabled();
+  // 届かなかった場合に備え、送信後も再送ボタンを残す。
+  expect(screen.getByRole("button", { name: "確認メールを再送する" })).toBeEnabled();
 });
 
-test("code の無いエラーは message をそのまま表示する（自前フックの日本語 message）", async () => {
+test("送信に失敗するとエラーメッセージを表示しボタンが再度有効になる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
-  deleteUserMock.mockResolvedValue({ error: { message: "パスワードを入力してください" } });
+  deleteUserMock.mockResolvedValue({ error: { message: "送信できませんでした" } });
 
   renderWithClient(<SettingsPage />);
-  await submitDelete();
+  await requestDelete();
 
-  await waitFor(() => expect(screen.getByText("パスワードを入力してください")).toBeInTheDocument());
-  expect(pushMock).not.toHaveBeenCalled();
+  await waitFor(() => expect(screen.getByText("送信できませんでした")).toBeInTheDocument());
+  expect(screen.getByRole("button", { name: "アカウント削除の確認メールを送る" })).toBeEnabled();
+});
+
+test("送信成功後に再送が失敗すると、成功バナーを畳んでエラーだけを表示する", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 1 回目は成功、2 回目（再送）は失敗を返す。
+  deleteUserMock
+    .mockResolvedValueOnce({ error: null })
+    .mockResolvedValueOnce({ error: { message: "送信できませんでした" } });
+
+  renderWithClient(<SettingsPage />);
+  await requestDelete();
+  await waitFor(() => expect(screen.getByText(/確認メールを送信しました/)).toBeInTheDocument());
+
+  await userEvent.click(screen.getByRole("button", { name: "確認メールを再送する" }));
+
+  // 失敗後は成功バナーが消え、エラーのみが残る（緑と赤の同時表示を避ける）。
+  await waitFor(() => expect(screen.getByText("送信できませんでした")).toBeInTheDocument());
+  expect(screen.queryByText(/確認メールを送信しました/)).not.toBeInTheDocument();
 });
 
 test("ネットワークエラー時もエラーメッセージを表示しボタンが再度有効になる", async () => {
@@ -168,11 +149,10 @@ test("ネットワークエラー時もエラーメッセージを表示しボ�
   deleteUserMock.mockRejectedValue(new TypeError("Failed to fetch"));
 
   renderWithClient(<SettingsPage />);
-  await submitDelete();
+  await requestDelete();
 
   await waitFor(() =>
-    expect(screen.getByText("アカウントの削除に失敗しました")).toBeInTheDocument(),
+    expect(screen.getByText("確認メールの送信に失敗しました")).toBeInTheDocument(),
   );
-  expect(pushMock).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "アカウントを削除" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "アカウント削除の確認メールを送る" })).toBeEnabled();
 });
