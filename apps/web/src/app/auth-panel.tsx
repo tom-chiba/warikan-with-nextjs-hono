@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type FormEvent, type KeyboardEvent, useRef, useState } from "react";
 import { sendVerificationEmail, signIn, signUp, verifyEmailCallbackURL } from "@/lib/auth-client";
+import { PasskeySignInButton } from "./passkey-sign-in-button";
 
 type AuthMode = "signIn" | "signUp";
 
@@ -236,6 +237,9 @@ export function AuthPanel({
         <button type="submit" disabled={submitting} className="btn btn-fill">
           {TAB_LABELS[mode]}
         </button>
+        {/* パスキーでのログイン（#90）。登録済みのユーザーが ID/パスワード入力を省いて最速で入れる。
+            メール+パスワードと併存する第 2 手段のため、サインインタブにのみ示す。 */}
+        {mode === "signIn" && <PasskeySignInButton />}
         {/* パスワード再設定への導線（#68）。名前が不要なサインイン時にのみ示す。 */}
         {mode === "signIn" && (
           <Link href="/forgot-password" className="link-quiet self-start">

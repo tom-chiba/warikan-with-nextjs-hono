@@ -1,3 +1,4 @@
+import { passkey } from "@better-auth/passkey";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
@@ -15,12 +16,18 @@ import { testPasswordHasher } from "./internal/test-password-hasher";
 export function createAuth(env: Env) {
   // adapter と afterDelete で同じリクエストスコープの Drizzle インスタンスを共有する。
   const db = createDb(env.DB);
+  // ブラウザ(web)のオリジン。dev は localhost:3000、本番は WEB_ORIGIN（カンマ区切りで複数可）。
+  // CSRF 用の trustedOrigins と、パスキー（WebAuthn）の rpID/origin の両方の基準にする。
+  const webOrigins = (env.WEB_ORIGIN ?? "http://localhost:3000").split(",");
+  // WebAuthn の rpID は「セレモニーが走る web オリジン」のホスト名（dev: localhost /
+  // 本番: warikan.tom-chiba.com）。baseURL は api ドメインのため、ここから導出してはいけない。
+  const rpID = new URL(webOrigins[0]).hostname;
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     // ブラウザは別オリジン(dev: localhost:3000)から認証を呼ぶため、CSRF 用に信頼する。
     // 本番は WEB_ORIGIN（カンマ区切りで複数可）で差し替える。
-    trustedOrigins: (env.WEB_ORIGIN ?? "http://localhost:3000").split(","),
+    trustedOrigins: webOrigins,
     database: drizzleAdapter(db, {
       provider: "sqlite",
       schema,
@@ -177,6 +184,19 @@ export function createAuth(env: Env) {
         },
       },
     },
+    plugins: [
+      // パスキー（WebAuthn）を「メール+パスワードと併存する第 2 のログイン手段」として追加する（#90）。
+      // registration.requireSession の既定 true をそのまま使う＝「ログイン済みでないと登録できない」ため、
+      // パスキーは常に既存アカウント（同じ user.id）へ後付けで紐づく。パスキーのみでの新規登録
+      //（パスキーファースト）は今回スコープ外。
+      passkey({
+        // rpID/origin は web オリジン基準（baseURL の api ドメインではない）。dev: localhost、
+        // 本番: warikan.tom-chiba.com。origin は複数 web オリジンを許容するため配列を渡す。
+        rpID,
+        rpName: "warikan",
+        origin: webOrigins,
+      }),
+    ],
   });
 }
 
