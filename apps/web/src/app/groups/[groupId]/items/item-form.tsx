@@ -251,8 +251,12 @@ export function ItemForm({
                   const checked = e.target.checked;
                   setEqualSplit(checked);
                   // ON にした時点で現在の支払額合計を等分して割勘へ反映する。
+                  // OFF にしたら等分で自動入力された割勘を破棄し、手入力をまっさらな状態から始められるようにする
+                  // （割勘欄の手入力や「残りをここに」による自動 OFF は手動調整の継続なのでクリアしない）。
                   if (checked) {
                     applyEqualSplit(payments);
+                  } else {
+                    setShares(EMPTY);
                   }
                 }}
               />

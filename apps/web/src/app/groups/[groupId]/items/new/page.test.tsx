@@ -115,6 +115,20 @@ test("割勘が支払額を超過しているとき「残りをここに」は�
   expect(fillButtons[0]).toBeDisabled();
 });
 
+test("等分を OFF にすると入力済みの割勘金額がクリアされる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  renderWithClient(<NewItemPage />);
+
+  await userEvent.type(await screen.findByLabelText("わたし の支払額"), "1000"); // 等分（デフォルト ON）→ 500/500
+  expect(await screen.findByLabelText("わたし の割勘金額")).toHaveValue(500);
+
+  // 等分を OFF → 自動入力された割勘は破棄され、手入力をまっさらな状態から始められる。
+  await userEvent.click(screen.getByRole("checkbox"));
+  expect(screen.getByLabelText("わたし の割勘金額")).toHaveValue(null);
+  expect(screen.getByLabelText("ともだち の割勘金額")).toHaveValue(null);
+});
+
 test("等分 ON 中に割勘を手入力するとスイッチが OFF になる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   setTwoMembers();
