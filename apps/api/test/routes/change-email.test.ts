@@ -91,6 +91,29 @@ describe("POST /api/auth/change-email（メールアドレス変更）", () => {
     expect(session?.user.email).toBe("ce-session-new@example.com");
   });
 
+  it("無効・期限切れトークンのリンクではメールアドレスは変更されない", async () => {
+    const cookie = await signUpAndGetCookie("ce-bad-token@example.com");
+    await clearEmails();
+
+    const res = await changeEmail(cookie, "ce-bad-token-new@example.com");
+    expect(res.status).toBe(200);
+
+    // 確認メールと同形だが明らかに無効なトークンでリンクを踏む。verify-email は
+    // INVALID_TOKEN / TOKEN_EXPIRED いずれも callbackURL に error を付けて 302 で戻し、
+    // メールアドレスは更新しない（受け入れ条件: 期限切れ・無効トークンでは変更されない）。
+    const callbackURL = `${WEB_ORIGIN}/verify-email`;
+    const verifyRes = await SELF.fetch(
+      `${BASE}/api/auth/verify-email?token=obviously-invalid&callbackURL=${encodeURIComponent(callbackURL)}`,
+      { headers: { cookie }, redirect: "manual" },
+    );
+    expect(verifyRes.status).toBe(302);
+    expect(verifyRes.headers.get("location") ?? "").toContain(`${callbackURL}?error=`);
+
+    // 変更前のメールのまま、新アドレスは作られていない。
+    expect(await getDbEmail("ce-bad-token@example.com")).toBe("ce-bad-token@example.com");
+    expect(await getDbEmail("ce-bad-token-new@example.com")).toBeNull();
+  });
+
   it("大文字を含む入力は小文字に正規化して保存される", async () => {
     const cookie = await signUpAndGetCookie("ce-case@example.com");
     await clearEmails();
