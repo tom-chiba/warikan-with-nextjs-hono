@@ -147,17 +147,27 @@ export function createAuth(env: Env) {
       }),
     },
     user: {
-      // メールアドレス変更（#61）。updateEmailWithoutVerification は現メールが未検証
-      //（emailVerified !== true）の場合のみ即時変更として働く。
-      // #69 でサインアップ時のメール検証を導入したため、今後の新規ユーザーと
-      // バックフィル済みの既存ユーザーはすべて emailVerified=true となり、このオプションは
-      // 実質無効化される（Better Auth 標準の「新メールへ確認リンク送付」フローに切り替わるが、
-      // emailVerification を実装済みの今は確認リンク方式が機能する）。
-      // ただし changeEmail を確認メール方式へ正式対応させる（変更先への確認導線・UI 整備）のは
-      // #69 のスコープ外で、後続 Issue とする（#69 の実装方針メモ「スコープ外」参照）。
+      // メールアドレス変更を確認メール（リンク）方式にする（#77）。検証済みユーザーが誤った
+      // アドレスへ変更すると、実在しないアカウントになりパスワード再設定メール（#68）も届かず
+      // 復旧不能になりうるため、リンクを踏むまで変更を反映しない。
+      //
+      // Better Auth 1.6 の /change-email は次の順で経路を選ぶ（dist/api/routes/update-user.mjs）:
+      //   1. emailVerified !== true && updateEmailWithoutVerification → 即時変更
+      //   2. emailVerified && sendChangeEmailConfirmation → 「現アドレス」宛に確認リンク
+      //   3. それ以外で emailVerification.sendVerificationEmail あり → 「新アドレス」宛に確認リンク
+      // #69 で全ユーザーが emailVerified=true となったため 1 は発生しない。ここで採るのは 3 で、
+      // 確認リンクを「新アドレス」宛に送る（requestType: change-email-verification）。踏破すると
+      // email が新アドレスへ更新され、同時に emailVerified=true になる。
+      //
+      // sendChangeEmailConfirmation（経路 2）はあえて設定しない。経路 2 は確認リンクを「現アドレス」
+      // 宛に送る乗っ取り対策だが、新アドレスの到達性を検証しないため #77 の核心（誤アドレスでの
+      // 復旧不能を防ぐ）を満たせない。新アドレス宛確認（経路 3）こそが目的に合致する。
+      //
+      // updateEmailWithoutVerification は設定しない（既定 false）。現状の検証済みユーザーでは
+      // どちらでも経路 3 に落ちるが、明示的に false としておけば未検証セッションが万一できても
+      // 即時変更（経路 1）に逃げず、必ず確認リンクを経由する。
       changeEmail: {
         enabled: true,
-        updateEmailWithoutVerification: true,
       },
       // アカウント削除（退会）。パスワード再入力（authClient.deleteUser({ password })）で
       // 本人確認して即削除する。メール送信基盤が未整備のため確認リンク方式は採らない（#33）。
