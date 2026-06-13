@@ -3,6 +3,7 @@
 import { apiClient } from "@/lib/api-client";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemForm, type ItemFormValues } from "./groups/[groupId]/items/item-form";
+import { PurchasedOnDuplicates } from "./groups/[groupId]/items/purchased-on-duplicates";
 
 // ルートページのクイック入力。グループを指定すると、メンバー取得・保存処理・入力フォームを
 // 自己完結で提供する（/groups/[groupId]/items/new と同等の入力体験を / 上で再現する）。
@@ -43,6 +44,9 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
           submitLabel="保存"
           resetAfterSubmit
           successMessage="保存しました。続けて入力できます。"
+          renderPurchasedOnNote={(purchasedOn) => (
+            <PurchasedOnDuplicates groupId={groupId} purchasedOn={purchasedOn} />
+          )}
           onSubmit={handleSubmit}
         />
       )}

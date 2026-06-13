@@ -7,6 +7,7 @@ import { apiClient } from "@/lib/api-client";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm, type ItemFormValues } from "../item-form";
+import { PurchasedOnDuplicates } from "../purchased-on-duplicates";
 
 export default function NewItemPage() {
   const params = useParams<{ groupId: string }>();
@@ -53,6 +54,9 @@ export default function NewItemPage() {
         submitLabel="保存"
         resetAfterSubmit
         successMessage="保存しました。続けて入力できます。"
+        renderPurchasedOnNote={(purchasedOn) => (
+          <PurchasedOnDuplicates groupId={groupId} purchasedOn={purchasedOn} />
+        )}
         onSubmit={handleSubmit}
       />
 

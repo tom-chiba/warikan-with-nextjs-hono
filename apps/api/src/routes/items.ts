@@ -92,23 +92,37 @@ export const items = new Hono<{
 
     return c.json({ id }, 201);
   })
-  // 購入品を一覧で返す。status（既定 unsettled）で絞り込み、各 item に合計金額と
-  // メンバーごとの payments / shares を埋め込む（送金計算・編集プリフィルに使う）。
+  // 購入品を一覧で返す。各 item に合計金額とメンバーごとの payments / shares を埋め込む
+  //（送金計算・編集プリフィルに使う）。
+  // 絞り込みは 2 通り: 通常は status（既定 unsettled）で絞る。purchasedOn を指定した場合は
+  // 「この日に入力済みか」の確認用途のため status を問わず（未精算＋精算済を横断）その購入日で絞る。
   .get(
     "/:groupId/items",
     zValidator(
       "query",
-      z.object({ status: z.enum(["unsettled", "settled"]).default("unsettled") }),
+      z.object({
+        status: z.enum(["unsettled", "settled"]).default("unsettled"),
+        purchasedOn: z.iso.date().optional(),
+      }),
     ),
     async (c) => {
       const member = c.get("groupMember");
       const db = c.get("db");
-      const { status } = c.req.valid("query");
+      const { status, purchasedOn } = c.req.valid("query");
+
+      // purchasedOn は POST と同じく "YYYY-MM-DD" → UTC 0 時の timestamp として格納されるため、
+      // 同じ日付文字列を new Date() した値と完全一致する（サーバの TZ に依存しない）。
+      const conditions = [eq(item.groupId, member.groupId)];
+      if (purchasedOn) {
+        conditions.push(eq(item.purchasedOn, new Date(purchasedOn)));
+      } else {
+        conditions.push(eq(item.status, status));
+      }
 
       const rows = await db
         .select()
         .from(item)
-        .where(and(eq(item.groupId, member.groupId), eq(item.status, status)))
+        .where(and(...conditions))
         .orderBy(desc(item.createdAt));
 
       const ids = rows.map((r) => r.id);
