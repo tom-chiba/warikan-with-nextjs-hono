@@ -57,6 +57,16 @@ function totalOf(amounts: Record<string, string>, userIds: string[]): number {
 
 const EMPTY: Record<string, string> = {};
 
+// ローカルタイムゾーンでの「今日」を input[type=date] 用の "YYYY-MM-DD" で返す。
+// toISOString() は UTC 基準で日付がずれうるため、ローカルの年月日から組み立てる。
+function todayLocal(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function ItemForm({
   members,
   initial,
@@ -67,7 +77,9 @@ export function ItemForm({
   onSubmit,
 }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [purchasedOn, setPurchasedOn] = useState(initial?.purchasedOn ?? "");
+  // 新規入力（initial なし）では購入日のデフォルトを今日にする。購入品の多くは入力当日のものなので
+  // 入力ステップを 1 つ減らせる。編集時は保存済みの購入日をそのまま使う（等分の !initial と同じ考え方）。
+  const [purchasedOn, setPurchasedOn] = useState(initial?.purchasedOn ?? todayLocal());
   const [memo, setMemo] = useState(initial?.memo ?? "");
   // 入力中の値は文字列で保持する（空欄と 0 を区別し、IME や前ゼロ等の編集を妨げない）。
   const [payments, setPayments] = useState<Record<string, string>>(initial?.payments ?? EMPTY);
@@ -164,7 +176,7 @@ export function ItemForm({
 
       if (resetAfterSubmit) {
         setName("");
-        setPurchasedOn("");
+        setPurchasedOn(todayLocal());
         setMemo("");
         setPayments(EMPTY);
         setShares(EMPTY);

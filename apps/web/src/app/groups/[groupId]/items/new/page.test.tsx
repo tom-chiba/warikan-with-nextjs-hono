@@ -38,6 +38,15 @@ afterEach(() => {
 const loggedIn = { data: { user: { id: "u1", email: "me@example.com" } }, isPending: false };
 const nowIso = new Date().toISOString();
 
+// 新規入力フォームは購入日に「今日（ローカル）」を初期表示する。ItemForm 側と同じ算出で期待値を作る。
+function todayLocal(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 // メンバー 2 名（わたし / ともだち）を返すデフォルト。
 function setTwoMembers() {
   membersGetMock.mockResolvedValue({
@@ -178,7 +187,7 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
       param: { groupId: "g1" },
       json: {
         name: "ランチ",
-        purchasedOn: null,
+        purchasedOn: todayLocal(),
         memo: null,
         payments: [{ userId: "u1", amount: 1000 }],
         shares: [
