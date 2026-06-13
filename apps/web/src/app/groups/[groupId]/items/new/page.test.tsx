@@ -1,6 +1,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
+import { todayLocal } from "@/lib/date";
 import { renderWithClient } from "@/test/render-with-client";
 
 const { useSessionMock, membersGetMock, itemsPostMock } = vi.hoisted(() => ({
@@ -178,7 +179,7 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
       param: { groupId: "g1" },
       json: {
         name: "ランチ",
-        purchasedOn: null,
+        purchasedOn: todayLocal(),
         memo: null,
         payments: [{ userId: "u1", amount: 1000 }],
         shares: [
