@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import { distributeEqually } from "@warikan/domain";
 import { formatAmount } from "@/lib/format";
 
@@ -36,6 +36,9 @@ type ItemFormProps = {
   resetAfterSubmit?: boolean;
   // 成功時に表示するメッセージ（任意）。
   successMessage?: string;
+  // 購入日が選択されているときに、購入日欄の直下へ差し込む任意の注記。
+  // 「この日にもう入力済みか」の確認表示などに使う（取得・表示は呼び出し側に委ね、本体には依存を持たせない）。
+  renderPurchasedOnNote?: (purchasedOn: string) => ReactNode;
   onSubmit: (values: ItemFormValues) => Promise<void>;
 };
 
@@ -60,6 +63,7 @@ export function ItemForm({
   submitLabel,
   resetAfterSubmit = false,
   successMessage,
+  renderPurchasedOnNote,
   onSubmit,
 }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -203,6 +207,8 @@ export function ItemForm({
             className="field"
           />
         </label>
+        {/* 購入日が選択されているときだけ、呼び出し側が渡す注記（重複入力の確認など）を差し込む。 */}
+        {purchasedOn && renderPurchasedOnNote?.(purchasedOn)}
         <label className="flex flex-col gap-1">
           <span className="text-sm font-bold">メモ（任意）</span>
           <textarea

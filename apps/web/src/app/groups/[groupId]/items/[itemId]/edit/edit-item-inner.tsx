@@ -8,6 +8,7 @@ import { apiClient } from "@/lib/api-client";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm, type ItemFormInitial, type ItemFormValues } from "../../item-form";
+import { PurchasedOnDuplicates } from "../../purchased-on-duplicates";
 
 // 購入品編集ページの本体。未精算・精算済のどちらのアイテムも編集できる（Issue #24）。
 // ?from=settled で精算済一覧から遷移してきたことを示し、更新後・戻るの遷移先を切り替える。
@@ -103,7 +104,19 @@ export function EditItemInner() {
 
       {/* 初期値が確定してからフォームを描画する（ItemForm は初期値をマウント時に取り込むため）。 */}
       {item && initial ? (
-        <ItemForm members={members} initial={initial} submitLabel="更新" onSubmit={handleSubmit} />
+        <ItemForm
+          members={members}
+          initial={initial}
+          submitLabel="更新"
+          renderPurchasedOnNote={(purchasedOn) => (
+            <PurchasedOnDuplicates
+              groupId={groupId}
+              purchasedOn={purchasedOn}
+              excludeItemId={itemId}
+            />
+          )}
+          onSubmit={handleSubmit}
+        />
       ) : (
         !fetchError && <p className="note-muted">読み込み中…</p>
       )}
