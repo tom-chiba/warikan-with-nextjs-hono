@@ -15,6 +15,8 @@ concurrency:
 
 permissions:
   contents: read
+  # デプロイ失敗時に通知用 Issue を作成・コメントするため。
+  issues: write
 
 jobs:
   deploy:
@@ -36,6 +38,17 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # 認可エラー(7403 等)を migrate 前に明示メッセージで検知する。
+      # トークン失効・D1 編集権限の欠落・アカウント不一致を切り分けやすくする
+      # (#101: トークン権限の問題に長時間気付けなかった再発防止)。
+      - name: Verify Cloudflare D1 access (preflight)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm --filter @warikan/api exec wrangler d1 execute warikan-db --remote --command 'SELECT 1' \
+            || { echo "::error::Cloudflare D1 への認可に失敗しました。CLOUDFLARE_API_TOKEN の D1 編集権限・失効・アカウント不一致を確認してください (7403)。"; exit 1; }
+
       # 旧コードが新スキーマで動けるよう「マイグレーション → デプロイ」の順を守る
       # (後方互換のあるマイグレーションを前提とする)。
       - run: pnpm --filter @warikan/api db:migrate:remote
@@ -48,3 +61,19 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # デプロイ失敗に長時間気付けなかった再発防止(#101)。
+      # 失敗時に通知用 Issue を作成する。既存の open があればコメントを追記し重複を避ける。
+      - name: Notify on deploy failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          body=$(printf '本番デプロイ(Deploy ワークフロー)が失敗しました。\n\n- 失敗 run: %s\n- 対象コミット: `%s`\n\n`db:migrate:remote` の Cloudflare 認可エラー(7403 など)の可能性があります。`CLOUDFLARE_API_TOKEN` の D1 編集権限・失効・アカウント不一致を確認してください。' "$run_url" "${{ github.event.workflow_run.head_sha }}")
+          existing=$(gh issue list --state open --limit 100 --json number,title --jq 'map(select(.title == "本番デプロイ失敗")) | .[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title '本番デプロイ失敗' --body "$body"
+          fi
