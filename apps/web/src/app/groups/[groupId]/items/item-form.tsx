@@ -107,6 +107,19 @@ export function ItemForm({
     setShares((prev) => ({ ...prev, [userId]: value }));
   }
 
+  // 等分スイッチの切り替え。ON にした時点で現在の支払額合計を等分して割勘へ反映する。
+  // OFF にしたら等分で自動入力された割勘を破棄し、手入力をまっさらな状態から始められるようにする
+  // （割勘欄の手入力や「残りをここに」による自動 OFF は手動調整の継続なのでクリアしない）。
+  function handleEqualSplitToggle(checked: boolean) {
+    setSaved(false);
+    setEqualSplit(checked);
+    if (checked) {
+      applyEqualSplit(payments);
+    } else {
+      setShares(EMPTY);
+    }
+  }
+
   // 「残りをここに」: 不足分（支払額合計 − 現在の割勘金額合計）を対象メンバーへ加算する。
   // 手動調整なので等分スイッチは OFF にする。結果が負になる場合は 0 で止める。
   function handleFillRemainder(userId: string) {
@@ -246,15 +259,7 @@ export function ItemForm({
                 type="checkbox"
                 className="accent-accent"
                 checked={equalSplit}
-                onChange={(e) => {
-                  setSaved(false);
-                  const checked = e.target.checked;
-                  setEqualSplit(checked);
-                  // ON にした時点で現在の支払額合計を等分して割勘へ反映する。
-                  if (checked) {
-                    applyEqualSplit(payments);
-                  }
-                }}
+                onChange={(e) => handleEqualSplitToggle(e.target.checked)}
               />
               <span>等分（支払額合計を人数で等分し、端数は自動で振り分け）</span>
             </label>
