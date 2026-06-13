@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemForm, type ItemFormValues } from "./groups/[groupId]/items/item-form";
@@ -12,6 +13,7 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
   // ログイン済みの文脈でのみ描画される前提のため、常に取得する。
   const { data: membersData, isError: membersError } = useGroupMembers(groupId, true);
   const members = membersData?.members ?? [];
+  const queryClient = useQueryClient();
 
   async function handleSubmit(values: ItemFormValues) {
     const res = await apiClient.groups[":groupId"].items.$post({
@@ -26,6 +28,10 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
           : "購入品の保存に失敗しました",
       );
     }
+    // 連続入力では保存後も購入日が今日のまま維持され、PurchasedOnDuplicates が同じキーで
+    // マウントされ続けるため放置すると重複ヒントが保存前のままになる。当該日のクエリを無効化して
+    // 今入れたアイテムを反映させる（日付別に複数キーがありうるので groupId 前方一致で無効化）。
+    await queryClient.invalidateQueries({ queryKey: ["items-on-date", groupId] });
   }
 
   return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
@@ -13,6 +14,7 @@ export default function NewItemPage() {
   const params = useParams<{ groupId: string }>();
   const groupId = params.groupId;
   const { data: session, isPending } = useResolvedSession();
+  const queryClient = useQueryClient();
 
   // メンバー一覧（#7 の既存エンドポイント）。ログイン済みのときだけ取得する。
   const { data: membersData } = useGroupMembers(groupId, !!session);
@@ -40,6 +42,10 @@ export default function NewItemPage() {
           : "購入品の保存に失敗しました",
       );
     }
+    // 連続入力では保存後も購入日が今日のまま維持され、PurchasedOnDuplicates が同じキーで
+    // マウントされ続けるため放置すると重複ヒントが保存前のままになる。当該日のクエリを無効化して
+    // 今入れたアイテムを反映させる（日付別に複数キーがありうるので groupId 前方一致で無効化）。
+    await queryClient.invalidateQueries({ queryKey: ["items-on-date", groupId] });
   }
 
   return (
