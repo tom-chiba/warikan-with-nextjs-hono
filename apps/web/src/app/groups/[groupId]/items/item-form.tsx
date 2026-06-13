@@ -2,6 +2,7 @@
 
 import { type FormEvent, type ReactNode, useState } from "react";
 import { distributeEqually } from "@warikan/domain";
+import { todayLocal } from "@/lib/date";
 import { formatAmount } from "@/lib/format";
 
 // 購入品の入力フォーム（新規 #4 / 編集 #20 で共通利用）。
@@ -56,16 +57,6 @@ function totalOf(amounts: Record<string, string>, userIds: string[]): number {
 }
 
 const EMPTY: Record<string, string> = {};
-
-// ローカルタイムゾーンでの「今日」を input[type=date] 用の "YYYY-MM-DD" で返す。
-// toISOString() は UTC 基準で日付がずれうるため、ローカルの年月日から組み立てる。
-function todayLocal(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 export function ItemForm({
   members,

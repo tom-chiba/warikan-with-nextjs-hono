@@ -1,6 +1,7 @@
 import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
+import { todayLocal } from "@/lib/date";
 import { renderWithClient } from "@/test/render-with-client";
 
 // フォームの入力・検証の詳細は item-form / new/page のテストが担う。
@@ -31,15 +32,6 @@ afterEach(() => {
 });
 
 const nowIso = new Date().toISOString();
-
-// 新規入力フォームは購入日に「今日（ローカル）」を初期表示する。ItemForm 側と同じ算出で期待値を作る。
-function todayLocal(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
 
 // メンバー 2 名（わたし / ともだち）を返すデフォルト。
 function setTwoMembers() {
