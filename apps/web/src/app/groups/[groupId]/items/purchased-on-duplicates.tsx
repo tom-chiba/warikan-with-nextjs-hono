@@ -22,7 +22,7 @@ export function PurchasedOnDuplicates({
   purchasedOn,
   excludeItemId,
 }: PurchasedOnDuplicatesProps) {
-  const { data } = useQuery({
+  const { data, isError } = useQuery({
     queryKey: ["items-on-date", groupId, purchasedOn],
     enabled: !!purchasedOn,
     // 「もう入れたっけ？」の確認は最新の真実が要る。Provider 既定の staleTime（60s）を打ち消し、
@@ -39,6 +39,12 @@ export function PurchasedOnDuplicates({
       return res.json();
     },
   });
+
+  // 取得に失敗したときは「0 件」と区別できるよう控えめに知らせる。無表示だと
+  //「この日は未入力」と誤認させ、重複確認の役目を果たせない（取得失敗 ≠ 入力なし）。
+  if (isError) {
+    return <p className="note-muted">この日の入力済みを確認できませんでした。</p>;
+  }
 
   const items = (data?.items ?? []).filter((i) => i.id !== excludeItemId);
 
