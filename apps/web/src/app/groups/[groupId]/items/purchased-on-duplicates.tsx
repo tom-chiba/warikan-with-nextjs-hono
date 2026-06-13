@@ -25,6 +25,9 @@ export function PurchasedOnDuplicates({
   const { data } = useQuery({
     queryKey: ["items-on-date", groupId, purchasedOn],
     enabled: !!purchasedOn,
+    // 「もう入れたっけ？」の確認は最新の真実が要る。Provider 既定の staleTime（60s）を打ち消し、
+    // 購入日を選ぶ／変えるたびに必ず取得し直す（直前の連続入力で増えた分も取りこぼさない）。
+    staleTime: 0,
     queryFn: async () => {
       const res = await apiClient.groups[":groupId"].items.$get({
         param: { groupId },
