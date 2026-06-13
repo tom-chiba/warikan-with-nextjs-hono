@@ -93,10 +93,9 @@ export function createAuth(env: Env) {
       autoSignInAfterVerification: true,
     },
     hooks: {
-      // Better Auth の /delete-user はパスワード未指定（空文字含む）だと fresh session
-      //（既定 24 時間以内に発行されたセッション）であれば削除を許可するフォールバックを持つ。
-      // 本人確認は「パスワード再入力で即削除」（#33 / ADR-0011）のため、UI 任せにせず
-      // サーバー側でもパスワード必須を強制する。
+      // かつては /delete-user に「パスワード必須」を強制していた（#33 / ADR-0011 の即削除方式）。
+      // #78 で確認メールのリンク方式（下の deleteUser.sendDeleteAccountVerification）へ移行し、
+      // 本人確認はリンク踏破が担うため、その強制は撤去した。
       before: createAuthMiddleware(async (ctx) => {
         // Better Auth の既定では name は存在チェックのみで、空文字・空白のみでも通る。
         // user.name は notNull かつメンバー一覧等にそのまま表示されるため（#60）、

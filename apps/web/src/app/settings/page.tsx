@@ -95,21 +95,24 @@ export default function SettingsPage() {
         <p className="note-muted">
           アカウントを削除（退会）します。あなただけが参加しているグループは削除され、他のメンバーが残るグループでもあなたの支払・負担記録は削除されます。この操作は取り消せません。
         </p>
-        {sent ? (
+        {sent && (
           <p className="note-ok">
             確認メールを送信しました。同じブラウザでメール内のリンクを開くと削除が完了します（リンクの有効期限は約1時間です）。サインアウトせずにお待ちください。
           </p>
-        ) : (
-          <form onSubmit={handleRequestDelete} className="flex flex-col gap-3">
-            <p className="note-muted">
-              下のボタンを押すと確認メールを送信します。メール内のリンクを開くまで削除は実行されません。
-            </p>
-            {error && <p className="note-danger">{error}</p>}
-            <button type="submit" disabled={submitting} className="btn btn-fill-danger">
-              アカウント削除の確認メールを送る
-            </button>
-          </form>
         )}
+        <form onSubmit={handleRequestDelete} className="flex flex-col gap-3">
+          {/* 送信後も再送できるようにする。リンクは約1時間で失効し、メールが届かない場合の
+              復帰導線が無いと詰まるため、sent 状態でも案内文を「再送」に切り替えてボタンを残す。 */}
+          <p className="note-muted">
+            {sent
+              ? "メールが届かない場合は、もう一度押すと確認メールを再送できます。"
+              : "下のボタンを押すと確認メールを送信します。メール内のリンクを開くまで削除は実行されません。"}
+          </p>
+          {error && <p className="note-danger">{error}</p>}
+          <button type="submit" disabled={submitting} className="btn btn-fill-danger">
+            {sent ? "確認メールを再送する" : "アカウント削除の確認メールを送る"}
+          </button>
+        </form>
       </section>
 
       <Link href="/" className="link-quiet self-start">

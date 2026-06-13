@@ -111,6 +111,8 @@ test("確認メールの送信に成功すると案内を表示し、callbackURL
   await waitFor(() => expect(screen.getByText(/確認メールを送信しました/)).toBeInTheDocument());
   // 送信後は即削除されない（リンク踏破で確定）ため、ホームへの遷移は起こさない。
   expect(pushMock).not.toHaveBeenCalled();
+  // 届かなかった場合に備え、送信後も再送ボタンを残す。
+  expect(screen.getByRole("button", { name: "確認メールを再送する" })).toBeEnabled();
 });
 
 test("送信に失敗するとエラーメッセージを表示しボタンが再度有効になる", async () => {

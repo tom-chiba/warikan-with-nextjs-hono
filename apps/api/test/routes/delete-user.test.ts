@@ -211,10 +211,11 @@ describe("アカウント削除（確認メールのリンク方式 / #78）", (
     await requestDelete(cookie);
     const url = extractDeleteUrl(await latestEmailTo("du-no-session@example.com"));
 
-    // cookie を付けずに踏む。コールバックはセッション必須のため削除されない。
+    // cookie を付けずに踏む。コールバックはセッション必須のため、リダイレクトせず NOT_FOUND を返し
+    // 削除も実行されない（無効トークン時と同じ 404）。
     const res = await SELF.fetch(url, { redirect: "manual" });
 
-    expect(res.status).not.toBe(302);
+    expect(res.status).toBe(404);
     expect(await userExists(userId)).toBe(true);
   });
 
