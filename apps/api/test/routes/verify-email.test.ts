@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearEmails, listEmails, type SentEmail } from "../helpers/email-inbox";
+import { clearEmails, latestEmailTo, type SentEmail } from "../helpers/email-inbox";
 
 const BASE = env.BETTER_AUTH_URL;
 
@@ -34,14 +34,6 @@ function extractVerifyUrl(email: SentEmail): string {
     throw new Error(`verify link not found in email body: ${body}`);
   }
   return match[0];
-}
-
-async function latestEmailTo(to: string): Promise<SentEmail> {
-  const mail = (await listEmails()).findLast((e) => e.to === to);
-  if (!mail) {
-    throw new Error(`${to} 宛のメールが受信箱に無い`);
-  }
-  return mail;
 }
 
 describe("サインアップ時のメールアドレス検証（#69）", () => {

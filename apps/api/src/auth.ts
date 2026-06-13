@@ -169,10 +169,13 @@ export function createAuth(env: Env) {
       // アカウント削除（退会）。確認メール内のリンクを踏むことで削除を実行する（#78）。#33 では
       // メール送信基盤が未整備だったためパスワード再入力で即削除していたが、#70 で基盤が整い、
       // 当初見送った確認リンク方式へ移行した。確認メールを挟むことで誤操作やセッション乗っ取り時の
-      // 即時削除を防げる。sendDeleteAccountVerification を設定すると Better Auth は /delete-user を
-      // 「即削除」ではなく「確認トークンを発行してメール送信」する経路に切り替える（password を渡しても
-      // この経路が優先される）。リンク（GET /delete-user/callback）は発行元と同一セッション前提で、
-      // 踏破時に下の afterDelete を含む削除処理が走り callbackURL（web の /account-deleted）へ戻る。
+      // 即時削除を防げる。sendDeleteAccountVerification を設定すると Better Auth の /delete-user は、
+      // body に token が無い通常リクエストでは「即削除」ではなく「確認トークンを発行してメール送信」
+      // する経路に入る（password を一緒に渡してもこのメール送信経路になり、即削除はされない）。
+      // なお body に有効な token を載せると即削除する分岐が先に評価されるが、Web からは token を
+      // 送らず、必ずメール内リンク（GET /delete-user/callback）経由で踏ませる。そのリンクは発行元と
+      // 同一セッション前提で、踏破時に下の afterDelete を含む削除処理が走り callbackURL（web の
+      // /account-deleted）へ戻る。
       deleteUser: {
         enabled: true,
         // 確認リンクの有効期限（秒）。Better Auth 既定は 24h だが、パスワード再設定・メール検証リンク

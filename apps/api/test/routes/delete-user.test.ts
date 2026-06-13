@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearEmails, listEmails, type SentEmail } from "../helpers/email-inbox";
+import { clearEmails, latestEmailTo, type SentEmail } from "../helpers/email-inbox";
 import { getUserId, signUpAndGetCookie } from "../helpers/auth-session";
 import { addMember, createGroup } from "../helpers/group";
 
@@ -35,14 +35,6 @@ function extractDeleteUrl(email: SentEmail): string {
     throw new Error(`delete link not found in email body: ${body}`);
   }
   return match[0];
-}
-
-async function latestEmailTo(to: string): Promise<SentEmail> {
-  const mail = (await listEmails()).findLast((e) => e.to === to);
-  if (!mail) {
-    throw new Error(`${to} 宛のメールが受信箱に無い`);
-  }
-  return mail;
 }
 
 // 削除確認リンク（GET）を踏む。発行元と同一セッション（cookie）前提で、成功すると
@@ -217,6 +209,25 @@ describe("アカウント削除（確認メールのリンク方式 / #78）", (
 
     expect(res.status).toBe(404);
     expect(await userExists(userId)).toBe(true);
+  });
+
+  it("別ユーザーのセッションで他人の削除リンクを踏んでも削除されない", async () => {
+    // A が削除を要求し、A 宛のリンクを取得する。
+    const cookieA = await signUpAndGetCookie("du-victim@example.com");
+    const victimId = await getUserId(env.DB, "du-victim@example.com");
+    await requestDelete(cookieA);
+    const url = extractDeleteUrl(await latestEmailTo("du-victim@example.com"));
+
+    // 別ユーザー B がそのリンクを自分のセッションで踏む。トークンは A の user.id に紐づくため
+    //（token.value !== session.user.id）、コールバックは NOT_FOUND を返し、A も B も削除されない。
+    const cookieB = await signUpAndGetCookie("du-attacker@example.com");
+    const attackerId = await getUserId(env.DB, "du-attacker@example.com");
+
+    const res = await followDeleteLink(url, cookieB);
+
+    expect(res.status).toBe(404);
+    expect(await userExists(victimId)).toBe(true);
+    expect(await userExists(attackerId)).toBe(true);
   });
 
   it("未ログインでは削除を要求できない（401）", async () => {
