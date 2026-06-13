@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { passkeyAuthClient } from "@/lib/passkey-client";
+import { WEBAUTHN_CEREMONY_ABORTED, WEBAUTHN_PREVIOUSLY_REGISTERED } from "@/lib/passkey-errors";
+
+const ADD_FAILED_MESSAGE = "パスキーの登録に失敗しました。";
+const DELETE_FAILED_MESSAGE = "パスキーの削除に失敗しました。";
 
 // 設定画面のパスキー管理セクション（#90）。ログイン済みユーザーが自分の user.id に紐づくパスキーを
 // 登録・一覧・削除する。registration.requireSession（既定 true）により、ここでの登録は常に
@@ -29,22 +33,22 @@ export function PasskeySection() {
       );
       if (res?.error) {
         const code = "code" in res.error ? res.error.code : undefined;
-        // ユーザーがダイアログを閉じた場合は無言で戻る。それ以外は中立的な案内にする。
-        if (code === "REGISTRATION_CANCELLED") {
+        // ユーザーがダイアログを閉じた（= ERROR_CEREMONY_ABORTED）場合は無言で戻る。
+        if (code === WEBAUTHN_CEREMONY_ABORTED) {
           return;
         }
         // すでに登録済みのパスキーを再登録しようとした場合は分かりやすく伝える。
         setError(
-          code === "PREVIOUSLY_REGISTERED"
+          code === WEBAUTHN_PREVIOUSLY_REGISTERED
             ? "このパスキーはすでに登録されています。"
-            : "パスキーの登録に失敗しました。",
+            : ADD_FAILED_MESSAGE,
         );
         return;
       }
       // 成功。入力欄をリセットする（一覧は自動で再取得される）。
       setName("");
     } catch {
-      setError("パスキーの登録に失敗しました。");
+      setError(ADD_FAILED_MESSAGE);
     } finally {
       setSubmitting(false);
     }
@@ -59,10 +63,10 @@ export function PasskeySection() {
     try {
       const res = await passkeyAuthClient.passkey.deletePasskey({ id });
       if (res?.error) {
-        setError("パスキーの削除に失敗しました。");
+        setError(DELETE_FAILED_MESSAGE);
       }
     } catch {
-      setError("パスキーの削除に失敗しました。");
+      setError(DELETE_FAILED_MESSAGE);
     } finally {
       setDeletingId(null);
     }

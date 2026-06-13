@@ -1,6 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { WEBAUTHN_CEREMONY_ABORTED } from "@/lib/passkey-errors";
+
+// 失敗時の中立的な案内（API エラー・例外のどちらの経路でも同じ文言にする）。
+const SIGN_IN_FAILED_MESSAGE =
+  "パスキーでのログインに失敗しました。パスワードでのログインをお試しください。";
 
 // パスキー（WebAuthn）でのログインボタン（#90）。メール+パスワードと併存する第 2 のログイン手段。
 //
@@ -24,18 +29,18 @@ export function PasskeySignInButton() {
       const { refreshSession } = await import("@/lib/auth-client");
       const res = await passkeyAuthClient.signIn.passkey();
       if (res?.error) {
-        // ユーザーがダイアログを閉じた（キャンセル）場合はエラー表示しない。登録済みパスキーが無い・
-        // 認証失敗などはまとめて中立的な案内にする（パスワードログインへ誘導）。
-        if ("code" in res.error && res.error.code === "AUTH_CANCELLED") {
+        // ユーザーがダイアログを閉じた／タイムアウト（= ERROR_CEREMONY_ABORTED）はエラー表示しない。
+        // 登録済みパスキーが無い・認証失敗などはまとめて中立的な案内にする（パスワードログインへ誘導）。
+        if ("code" in res.error && res.error.code === WEBAUTHN_CEREMONY_ABORTED) {
           return;
         }
-        setError("パスキーでのログインに失敗しました。パスワードでのログインをお試しください。");
+        setError(SIGN_IN_FAILED_MESSAGE);
         return;
       }
       refreshSession();
     } catch {
       // ブラウザがキャンセルや未対応で例外を投げるケース。中立的な案内にとどめる。
-      setError("パスキーでのログインに失敗しました。パスワードでのログインをお試しください。");
+      setError(SIGN_IN_FAILED_MESSAGE);
     } finally {
       setSubmitting(false);
     }

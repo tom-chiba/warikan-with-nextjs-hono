@@ -12,8 +12,8 @@ import { createAuthClient } from "better-auth/react";
 //
 // baseURL は共有 authClient と同一（api オリジン）。セッション cookie は同一 api オリジンに対する
 // 同一サイト fetch で共有されるため、このクライアントでサインインしてもセッションは共有される。
-// ただし useSession を駆動するのは共有 authClient 側の nanostore なので、サインイン/登録の成功後は
-// 呼び出し側で notifyMainSessionRefresh()（= 共有クライアントの再取得）を呼ぶこと。
+// ただし useSession を駆動するのは共有 authClient 側の nanostore なので、サインインの成功後は
+// 呼び出し側で refreshSession()（auth-client.ts。= 共有クライアントの再取得）を呼ぶこと。
 const baseURL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export const passkeyAuthClient = createAuthClient({
