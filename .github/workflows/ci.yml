@@ -23,7 +23,9 @@ jobs:
       - uses: jdx/mise-action@v4
 
       # ロックファイルとの差分を許さずインストール。
-      - run: pnpm install --frozen-lockfile
+      # Dependabot PR は公開直後の版を含むため minimumReleaseAge を 0 にして
+      # 供給網ポリシーの再検証をスキップする（人手レビュー前提のため許容）。
+      - run: pnpm install --frozen-lockfile ${{ github.actor == 'dependabot[bot]' && '--config.minimumReleaseAge=0' || '' }}
 
       - run: pnpm lint
       - run: pnpm typecheck
@@ -36,7 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
-      - run: pnpm install --frozen-lockfile
+      # Dependabot PR は公開直後の版を含むため minimumReleaseAge を 0 にして
+      # 供給網ポリシーの再検証をスキップする（人手レビュー前提のため許容）。
+      - run: pnpm install --frozen-lockfile ${{ github.actor == 'dependabot[bot]' && '--config.minimumReleaseAge=0' || '' }}
 
       # wrangler.jsonc の vars には本番 URL が入るため、E2E(localhost) 用に .dev.vars で上書きする。
       - run: |
