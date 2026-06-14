@@ -12,6 +12,11 @@ import { buildResetPasswordEmail } from "./email/reset-password-email";
 import { buildVerificationEmail } from "./email/verify-email";
 import { testPasswordHasher } from "./internal/test-password-hasher";
 
+// セッション鮮度（freshAge）の基準秒数。passkey 登録などの sensitive 操作は、session.createdAt が
+// この値を超えた古いセッションを 403（SESSION_NOT_FRESH）で弾く（#105）。Better Auth 既定と同じ
+// 24h を「単一の真実」として明示し、E2E で「古いセッション」を再現する test-session.ts もこれを基準にする。
+export const SESSION_FRESH_AGE_SECONDS = 86400;
+
 // D1 バインディングや secret は実行時 env から渡るため、
 // auth インスタンスはシングルトンにせずリクエストごとに生成する。
 export function createAuth(env: Env) {
@@ -29,6 +34,11 @@ export function createAuth(env: Env) {
     // ブラウザは別オリジン(dev: localhost:3000)から認証を呼ぶため、CSRF 用に信頼する。
     // 本番は WEB_ORIGIN（カンマ区切りで複数可）で差し替える。
     trustedOrigins: webOrigins,
+    // セッション鮮度の基準を既定値と同じ 24h で明示する（#105）。passkey 登録の再認証フローや
+    // test-session.ts がこの値を前提にするため、暗黙の既定に頼らず単一の定数から与える。
+    session: {
+      freshAge: SESSION_FRESH_AGE_SECONDS,
+    },
     database: drizzleAdapter(db, {
       provider: "sqlite",
       schema,

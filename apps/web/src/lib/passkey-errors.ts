@@ -12,3 +12,12 @@ export const WEBAUTHN_CEREMONY_ABORTED = "ERROR_CEREMONY_ABORTED";
 
 // 同一アカウントの認証器に既に credential があり、再登録しようとした。
 export const WEBAUTHN_PREVIOUSLY_REGISTERED = "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED";
+
+// セッションの鮮度（freshAge、既定 24h）切れ。passkey の登録系エンドポイントは
+// registration.requireSession により freshSessionMiddleware が付き、session.createdAt が
+// freshAge を超えた古いセッションを 403 で弾く（code: "SESSION_NOT_FRESH" / #105）。
+// この場合 addPasskey は generate-register-options の 403 を error にそのまま載せて返す
+// （OS ダイアログ前に return する）。長命セッション運用ではログイン済みユーザーがほぼ確実に
+// 該当するため、これを検知してパスワード再認証フローへ誘導する。
+// 注意: これは WebAuthn の生コードではなく Better Auth 本体のエラーコード。
+export const SESSION_NOT_FRESH = "SESSION_NOT_FRESH";
