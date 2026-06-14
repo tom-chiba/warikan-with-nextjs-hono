@@ -16,6 +16,13 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Dependabot PR は公開直後の版を含むため minimumReleaseAge を 0 にして
+    # 供給網ポリシーの検証をスキップする（人手レビュー前提のため許容）。
+    # pnpm はスクリプト実行前にも依存検証を走らせるため、install だけでなく
+    # 全 pnpm 呼び出しにフラグを付ける。判定は head ブランチ名で行う
+    # （誰が push しても安定。main への push 時は空で厳格運用）。
+    env:
+      PNPM_FLAGS: ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -23,39 +30,36 @@ jobs:
       - uses: jdx/mise-action@v4
 
       # ロックファイルとの差分を許さずインストール。
-      # Dependabot PR は公開直後の版を含むため minimumReleaseAge を 0 にして
-      # 供給網ポリシーの再検証をスキップする（人手レビュー前提のため許容）。
-      # 判定は head ブランチ名で行う（誰が push しても安定。main への push 時は空で厳格運用）。
-      - run: pnpm install --frozen-lockfile ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
+      - run: pnpm $PNPM_FLAGS install --frozen-lockfile
 
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
+      - run: pnpm $PNPM_FLAGS lint
+      - run: pnpm $PNPM_FLAGS typecheck
+      - run: pnpm $PNPM_FLAGS test
       # 脆弱性の検知・更新は Dependabot（security updates / alerts）に任せ、
       # CI では audit を行わない（.github/dependabot.yml 参照）。
 
   e2e:
     runs-on: ubuntu-latest
+    # check ジョブと同じ理由で Dependabot PR のみ minimumReleaseAge を 0 にする。
+    env:
+      PNPM_FLAGS: ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
     steps:
       - uses: actions/checkout@v6
       - uses: jdx/mise-action@v4
-      # Dependabot PR は公開直後の版を含むため minimumReleaseAge を 0 にして
-      # 供給網ポリシーの再検証をスキップする（人手レビュー前提のため許容）。
-      # 判定は head ブランチ名で行う（誰が push しても安定。main への push 時は空で厳格運用）。
-      - run: pnpm install --frozen-lockfile ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
+      - run: pnpm $PNPM_FLAGS install --frozen-lockfile
 
       # wrangler.jsonc の vars には本番 URL が入るため、E2E(localhost) 用に .dev.vars で上書きする。
       - run: |
           printf 'BETTER_AUTH_SECRET=ci-e2e-secret-value-at-least-32-bytes\nBETTER_AUTH_URL=http://localhost:8787\nWEB_ORIGIN=http://localhost:3000\nEMAIL_TEST_INBOX=1\n' > apps/api/.dev.vars
 
       # ローカル D1 にマイグレーションを適用（DB 依存の E2E に備える）。
-      - run: pnpm --filter @warikan/api db:migrate:local
+      - run: pnpm $PNPM_FLAGS --filter @warikan/api db:migrate:local
 
       # Chromium と必要な OS 依存を導入。
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm $PNPM_FLAGS exec playwright install --with-deps chromium
 
       # webServer(api/web) は CI=true のため Playwright が起動・停止する。
-      - run: pnpm e2e
+      - run: pnpm $PNPM_FLAGS e2e
 
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
