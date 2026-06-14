@@ -10,7 +10,7 @@ interface Env {
   // Resend の API キー（機密 / #70）。本番は `wrangler secret put RESEND_API_KEY`。
   // 未設定なら実送信せず console 出力にフォールバックする（ローカル開発・テスト）。
   RESEND_API_KEY?: string;
-  // 送信元アドレス（非機密）。本番は wrangler.jsonc の vars。例: no-reply@warikan.tom-chiba.com。
+  // 送信元アドレス（非機密）。本番は wrangler.jsonc の vars。例: no-reply@tom-chiba.com。
   RESEND_FROM?: string;
   // テスト時のみ "1" を注入するフラグ（#70）。送信内容をインメモリ受信箱に記録し、
   // /__test__/* エンドポイントを有効化する。本番 wrangler.jsonc には絶対に追加しないこと。
