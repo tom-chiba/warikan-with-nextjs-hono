@@ -41,10 +41,14 @@ GitHub 連携が main へのマージで自動デプロイする。
 トランザクションメール（パスワード再設定 #68・メール検証 #69 の前提）を Resend で送る。
 `RESEND_API_KEY` が未設定の環境（ローカル・テスト）では実送信せず console 出力にフォールバックする。
 
-1. Resend にドメイン `warikan.tom-chiba.com` を追加（Resend ダッシュボード → Domains → Add Domain）。
+1. Resend にルートドメイン `tom-chiba.com` を追加（Resend ダッシュボード → Domains → Add Domain）。
+   - 無料プランは検証済みドメイン1つまで。ルートを登録し `*@tom-chiba.com` のローカルパートを
+     アプリごとに変える（warikan は `no-reply@tom-chiba.com`）ことで、複数の個人開発アプリで
+     1 ドメイン枠を共用する。MX/SPF は `send.tom-chiba.com` サブドメインに付くため、web 配信用の
+     A/AAAA やルートドメインでのメール受信には干渉しない。
 2. 提示された DNS レコード（SPF の TXT・DKIM・任意で MX/DMARC）を **Cloudflare DNS** に登録し、
    Resend 側で「Verified」になるまで待つ。
-   - 送信元 `RESEND_FROM`（`no-reply@warikan.tom-chiba.com`）は `apps/api/wrangler.jsonc` の `vars`
+   - 送信元 `RESEND_FROM`（`no-reply@tom-chiba.com`）は `apps/api/wrangler.jsonc` の `vars`
      に置く（非機密）。別アドレスにする場合はここを変更する。
 3. API キーを発行（Resend → API Keys）し、機密として登録（git に入れない）:
    ```

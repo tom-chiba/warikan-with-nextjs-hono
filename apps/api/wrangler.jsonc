@@ -25,7 +25,11 @@
     "BETTER_AUTH_URL": "https://warikan.api.tom-chiba.com",
     "WEB_ORIGIN": "https://warikan.tom-chiba.com",
     // メール送信元（非機密 / #70）。Resend で検証済みのドメインのアドレスにする。
-    // API キー(RESEND_API_KEY)は機密のため vars には置かず `wrangler secret put` で管理する。
-    "RESEND_FROM": "no-reply@warikan.tom-chiba.com",
+    // ルートドメイン tom-chiba.com を Resend に登録し、複数の個人開発アプリでローカルパートを
+    // 変えて 1 ドメイン枠（無料プランは検証済みドメイン1つまで）を共用する方針。送信専用サブ
+    // ドメインによる評判分離より共用を優先する。WEB_ORIGIN（web ドメイン warikan.tom-chiba.com）
+    // とは別物なので注意。API キー(RESEND_API_KEY)は機密のため vars には置かず
+    // `wrangler secret put` で管理する。
+    "RESEND_FROM": "no-reply@tom-chiba.com",
   },
 }

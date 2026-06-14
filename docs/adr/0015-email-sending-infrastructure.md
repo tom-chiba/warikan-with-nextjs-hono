@@ -40,8 +40,10 @@ Cloudflare Workers 上で動くため SMTP は使えず、HTTP API ベースの�
   の抽象（`EmailSender`）だけを公開する。
 - **env からの生成**: `createEmailSender(env)` を `createDb(env.DB)` と同じくリクエストごとに env から
   生成する。`RESEND_API_KEY` があれば実送信、無ければ console 出力にフォールバック。
-- **送信元は `no-reply@warikan.tom-chiba.com`**。`RESEND_FROM` を非機密 vars として wrangler.jsonc に置き、
-  `RESEND_API_KEY` は機密のため `wrangler secret` で管理する。
+- **送信元は `no-reply@tom-chiba.com`**（当初は `no-reply@warikan.tom-chiba.com`。Resend 無料プランの
+  検証済みドメイン1枠を複数の個人開発アプリで共用するため、ルートドメイン `tom-chiba.com` を登録し
+  アプリごとにローカルパートで出し分ける方針へ変更）。`RESEND_FROM` を非機密 vars として
+  wrangler.jsonc に置き、`RESEND_API_KEY` は機密のため `wrangler secret` で管理する。
 - **テスト受信箱**: `EMAIL_TEST_INBOX === "1"` のときだけ、送信内容をモジュールスコープのインメモリ
   受信箱に記録し、`/__test__/*`（`POST /send`・`GET /emails`・`DELETE /emails`）を有効化する。
   vitest は `SELF.fetch`、e2e は Playwright の `request` で同じ経路を使い、宛先・リンク URL を検証できる。
