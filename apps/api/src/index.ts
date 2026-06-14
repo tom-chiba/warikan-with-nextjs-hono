@@ -6,6 +6,7 @@ import { requireAuth } from "./middleware/require-auth";
 import { requireGroupMember } from "./middleware/require-group-member";
 import { routes } from "./rpc";
 import { testEmail } from "./routes/test-email";
+import { testSession } from "./routes/test-session";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -38,6 +39,9 @@ app.use("/__test__/*", async (c, next) => {
   await next();
 });
 app.route("/__test__", testEmail);
+// セッション鮮度切れ（#105）を E2E で再現するためのテスト専用フック。同じ EMAIL_TEST_INBOX
+// ガード配下にマウントするため、本番では露出しない。
+app.route("/__test__", testSession);
 
 // グループ配下のルートにミドルウェアを適用する。
 // Env/DB/auth に依存する処理は Bindings を持つ index.ts 側に集約し、
