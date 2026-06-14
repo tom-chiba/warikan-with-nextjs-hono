@@ -71,26 +71,42 @@ export function PasskeySection() {
     setReauthRequired(false);
   }
 
+  // addPasskey を 1 回試行して結果に応じて状態を更新する。初回（handleAdd）と再認証後
+  //（handleReauth）で挙動が分かれるのは stale-session と aborted の 2 ケースだけなので、
+  // その差分を afterReauth フラグで吸収し、共通のフローを 1 か所に集約する。
+  async function attemptAdd(afterReauth: boolean) {
+    const result = await addPasskeyOnce(name);
+    switch (result.status) {
+      case "ok":
+        finishSuccess();
+        return;
+      case "aborted":
+        // ユーザーがダイアログを閉じただけ。再認証後は再認証 UI も畳む（初回は名前を残して無言で戻る）。
+        if (afterReauth) {
+          setPassword("");
+          setReauthRequired(false);
+        }
+        return;
+      case "stale-session":
+        if (afterReauth) {
+          // 再認証直後でも fresh と見なされない異常時。汎用エラーにフォールバックする。
+          setError(ADD_FAILED_MESSAGE);
+        } else {
+          // freshAge 切れ（#105）。パスワード再入力 UI を出し、再認証後に再試行する。
+          setReauthRequired(true);
+        }
+        return;
+      case "error":
+        setError(result.message);
+        return;
+    }
+  }
+
   async function handleAdd() {
     setError(null);
     setSubmitting(true);
     try {
-      const result = await addPasskeyOnce(name);
-      switch (result.status) {
-        case "ok":
-          finishSuccess();
-          return;
-        case "aborted":
-          // ユーザーがダイアログを閉じただけ。無言で戻る。
-          return;
-        case "stale-session":
-          // freshAge 切れ（#105）。パスワード再入力 UI を出し、再認証後に再試行する。
-          setReauthRequired(true);
-          return;
-        case "error":
-          setError(result.message);
-          return;
-      }
+      await attemptAdd(false);
     } catch {
       setError(ADD_FAILED_MESSAGE);
     } finally {
@@ -117,24 +133,7 @@ export function PasskeySection() {
       }
       // 共有クライアントの nanostore を駆動して UI のセッション表示も最新化する。
       refreshSession();
-      const result = await addPasskeyOnce(name);
-      switch (result.status) {
-        case "ok":
-          finishSuccess();
-          return;
-        case "aborted":
-          // ダイアログを閉じただけ。再認証 UI は閉じ、パスワードは消す。
-          setPassword("");
-          setReauthRequired(false);
-          return;
-        case "stale-session":
-          // 再認証直後でも fresh と見なされない異常時。汎用エラーにフォールバックする。
-          setError(ADD_FAILED_MESSAGE);
-          return;
-        case "error":
-          setError(result.message);
-          return;
-      }
+      await attemptAdd(true);
     } catch {
       setError(ADD_FAILED_MESSAGE);
     } finally {

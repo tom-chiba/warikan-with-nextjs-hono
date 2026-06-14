@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { createAuth } from "../auth";
+import { createAuth, SESSION_FRESH_AGE_SECONDS } from "../auth";
 import { createDb } from "../db";
 import { session as sessionTable } from "../db/schema";
 
@@ -18,8 +18,9 @@ export const testSession = new Hono<{ Bindings: Env }>().post("/expire-freshness
   if (!resolved) {
     return c.json({ ok: false, error: "no session" }, 401);
   }
-  // freshAge（既定 24h = 86400 秒）を確実に超える 25 時間前へ created_at を巻き戻す。
-  const past = new Date(Date.now() - 25 * 60 * 60 * 1000);
+  // freshAge を確実に超える分だけ（+1h のマージン）過去へ created_at を巻き戻す。基準は auth.ts の
+  // SESSION_FRESH_AGE_SECONDS に紐づけ、将来 freshAge を変えてもこのフックが自動で追従するようにする。
+  const past = new Date(Date.now() - (SESSION_FRESH_AGE_SECONDS + 3600) * 1000);
   const db = createDb(c.env.DB);
   await db
     .update(sessionTable)
