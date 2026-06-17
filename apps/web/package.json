@@ -18,7 +18,7 @@
     "@warikan/api": "workspace:*",
     "@warikan/domain": "workspace:*",
     "better-auth": "^1.6.16",
-    "hono": "^4.12.23",
+    "hono": "^4.12.25",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
