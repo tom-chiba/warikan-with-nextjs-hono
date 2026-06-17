@@ -1,11 +1,15 @@
 version: 2
 updates:
-  # npm（pnpm）依存の更新。ルートと各 workspace をまとめて対象にする。
+  # npm（pnpm）依存の更新。ワークスペースのルート "/" のみを対象にする。
+  # pnpm-lock.yaml はルートに 1 つだけ存在する単一ロックファイルなので、
+  # /apps/* や /packages/* を個別ディレクトリとして列挙すると、メンバーの
+  # package.json は更新されてもルートのロックファイルが更新されず、CI の
+  # frozen-lockfile install で ERR_PNPM_OUTDATED_LOCKFILE になる
+  # （dependabot-core#11135 / #10758 の既知挙動）。ルートだけを対象にすれば
+  # Dependabot がワークスペース全メンバーの package.json を辿って更新し、
+  # 同一 PR でルートの pnpm-lock.yaml も更新する。
   - package-ecosystem: npm
-    directories:
-      - "/"
-      - "/apps/*"
-      - "/packages/*"
+    directory: "/"
     schedule:
       interval: weekly
     # pnpm-workspace.yaml の minimumReleaseAge（3日）に満たない版は CI / Vercel /
