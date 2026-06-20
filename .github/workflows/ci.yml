@@ -24,7 +24,7 @@ jobs:
     env:
       PNPM_FLAGS: ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # mise.toml から Node / pnpm のバージョンを再現する（ローカルと同一）。
       - uses: jdx/mise-action@v4
@@ -44,7 +44,7 @@ jobs:
     env:
       PNPM_FLAGS: ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: jdx/mise-action@v4
       - run: pnpm $PNPM_FLAGS install --frozen-lockfile
 
