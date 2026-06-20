@@ -22,10 +22,10 @@
     "db:migrate:remote": "wrangler d1 migrations apply warikan-db --remote"
   },
   "dependencies": {
-    "@better-auth/passkey": "^1.6.18",
+    "@better-auth/passkey": "^1.6.19",
     "@hono/zod-validator": "^0.8.0",
     "@warikan/domain": "workspace:*",
-    "better-auth": "^1.6.18",
+    "better-auth": "^1.6.19",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.25",
     "zod": "^4.4.3"
