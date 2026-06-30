@@ -30,7 +30,7 @@ jobs:
     steps:
       # デフォルトでは main 最新がチェックアウトされるため、
       # CI が検証したコミットを明示的に指定する。
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
