@@ -148,8 +148,9 @@ body {
      画面中央で一瞬だけ保存成功を強く伝え、約 0.7 秒後に自動でフェードアウトする。連続入力を妨げないよう、
      フェード中はタップを透過させフォーム操作をすぐ再開できるようにする（SaveCheck が状態を管理）。 */
   .save-check-backdrop {
-    @apply fixed inset-0 z-50 flex items-center justify-center;
-    /* 紙色を薄く敷いてチェックを浮かせる。ライト/ダークいずれの地色にも自然に馴染ませる。 */
+    @apply pointer-events-none fixed inset-0 z-50 flex items-center justify-center;
+    /* 紙色を薄く敷いてチェックを浮かせる。ライト/ダークいずれの地色にも自然に馴染ませる。
+       pointer-events は無効化し、表示中でも下のフォームへのタップを妨げない（保存後の連続入力を優先）。 */
     background: color-mix(in srgb, var(--paper) 55%, transparent);
     transition: opacity 400ms ease;
   }

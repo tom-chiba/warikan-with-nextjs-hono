@@ -67,13 +67,9 @@ function SaveCheck({ label }: { label: string }) {
 
   const fading = phase === "fading";
   return (
-    // 自動で消える一時的な確認表示。タップは早閉じの補助操作で、キーボード操作の対象にはしない。
-    <div
-      onClick={fading ? undefined : () => setPhase("fading")}
-      className="save-check-backdrop"
-      style={{ opacity: fading ? 0 : 1, pointerEvents: fading ? "none" : "auto" }}
-      aria-hidden={fading}
-    >
+    // 自動で消える一時的な確認表示。タップは常に下のフォームへ透過させ（backdrop は pointer-events:none）、
+    // 保存直後にすぐ次の入力欄へ触れられるようにする。早閉じは行わず自動フェードのみで消す。
+    <div className="save-check-backdrop" style={{ opacity: fading ? 0 : 1 }} aria-hidden={fading}>
       <div className="save-check-card" role="status">
         <span className="save-check-circle">
           <svg width="34" height="28" viewBox="0 0 34 28" fill="none" aria-hidden="true">
