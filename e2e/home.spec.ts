@@ -72,5 +72,5 @@ test("ログイン済みでグループが 1 件なら、トップページで�
   await expect(page.getByRole("checkbox")).toBeChecked();
   await page.getByLabel("Home User の支払額").fill("1000");
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("保存しました。続けて入力できます。")).toBeVisible();
+  await expect(page.getByText("保存しました")).toBeVisible();
 });

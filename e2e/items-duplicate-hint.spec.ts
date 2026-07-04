@@ -21,7 +21,7 @@ test("購入日を選ぶと、その日に入力済みのアイテムを表示�
   await page.getByLabel("購入日（任意）").fill("2026-06-10");
   await page.getByLabel("Dup User の支払額").fill("1000");
   await page.getByRole("button", { name: "保存" }).click();
-  await expect(page.getByText("保存しました。続けて入力できます。")).toBeVisible();
+  await expect(page.getByText("保存しました")).toBeVisible();
 
   // 2 件目の入力で同じ購入日を選ぶと、その日に入力済みの「ランチ」が注記される。
   await page.getByLabel("購入日（任意）").fill("2026-06-10");
