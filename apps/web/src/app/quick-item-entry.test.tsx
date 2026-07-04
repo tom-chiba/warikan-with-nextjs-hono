@@ -99,7 +99,7 @@ test("保存すると指定グループへ POST し、成功メッセージを�
       },
     });
   });
-  expect(await screen.findByText("保存しました。続けて入力できます。")).toBeInTheDocument();
+  expect(await screen.findByText("保存しました")).toBeInTheDocument();
 });
 
 test("同じ購入日（今日）で連続保存すると、重複ヒントが保存後に再取得される", async () => {

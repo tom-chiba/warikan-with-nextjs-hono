@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { distributeEqually } from "@warikan/domain";
 import { todayLocal } from "@/lib/date";
 import { formatAmount } from "@/lib/format";
@@ -35,13 +35,60 @@ type ItemFormProps = {
   submitLabel: string;
   // 成功後にフォームを初期化して同じ画面に留まるか（新規の連続入力 = true、編集 = false）。
   resetAfterSubmit?: boolean;
-  // 成功時に表示するメッセージ（任意）。
+  // 成功時に表示するメッセージ（任意）。指定した画面でのみ完了フィードバックのチェックを出す。
   successMessage?: string;
   // 購入日が選択されているときに、購入日欄の直下へ差し込む任意の注記。
   // 「この日にもう入力済みか」の確認表示などに使う（取得・表示は呼び出し側に委ね、本体には依存を持たせない）。
   renderPurchasedOnNote?: (purchasedOn: string) => ReactNode;
   onSubmit: (values: ItemFormValues) => Promise<void>;
 };
+
+// 保存成功時に画面中央で一瞬だけ出す完了フィードバック（購入完了フィードバック案 1b）。
+// 親側が保存のたびに key を変えて再マウントすることでエントランスを再生する。マウントから約 0.7 秒後に
+// フェードアウトし、フェード（0.4 秒）後に DOM から外れる。日常の連続入力を妨げないよう、フェード中は
+// タップを透過させ、表示中はタップで即座に閉じられるようにする。
+function SaveCheck({ label }: { label: string }) {
+  // マウント直後は shown。0.7 秒後に fading、さらにフェード完了後 hidden。
+  const [phase, setPhase] = useState<"shown" | "fading" | "hidden">("shown");
+
+  useEffect(() => {
+    // setState はいずれもタイマーのコールバック内（＝非同期）で行い、effect 本体では呼ばない。
+    const hide = setTimeout(() => setPhase("fading"), 700);
+    const remove = setTimeout(() => setPhase("hidden"), 700 + 400);
+    return () => {
+      clearTimeout(hide);
+      clearTimeout(remove);
+    };
+  }, []);
+
+  if (phase === "hidden") {
+    return null;
+  }
+
+  const fading = phase === "fading";
+  return (
+    // 自動で消える一時的な確認表示。タップは常に下のフォームへ透過させ（backdrop は pointer-events:none）、
+    // 保存直後にすぐ次の入力欄へ触れられるようにする。早閉じは行わず自動フェードのみで消す。
+    <div className="save-check-backdrop" style={{ opacity: fading ? 0 : 1 }} aria-hidden={fading}>
+      <div className="save-check-card" role="status">
+        <span className="save-check-circle">
+          <svg width="34" height="28" viewBox="0 0 34 28" fill="none" aria-hidden="true">
+            <path
+              d="M3 14L13 24L31 3"
+              stroke="var(--paper)"
+              strokeWidth="3.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="40"
+              className="save-check-path"
+            />
+          </svg>
+        </span>
+        <span className="save-check-label">{label}</span>
+      </div>
+    </div>
+  );
+}
 
 // 入力欄の文字列を金額（正の整数・円）に変換する。未入力・小数・負数・0・非数値は 0 とみなす。
 // type="number" は "1e2"（=100）等の指数表記を有効値として返すため、parseInt ではなく Number で
@@ -80,7 +127,9 @@ export function ItemForm({
   const [equalSplit, setEqualSplit] = useState(!initial);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // 保存成功のたびに増やす連番。SaveCheck のフィードバック再生トリガーに使う（真偽値だと連続保存で
+  // 同じ値のままになり再生されないため、増分するカウンタにする）。
+  const [savedTick, setSavedTick] = useState(0);
 
   const memberIds = members.map((m) => m.userId);
   const paymentTotal = totalOf(payments, memberIds);
@@ -99,7 +148,6 @@ export function ItemForm({
 
   // 支払額を変更する。等分 ON のときは新しい支払額合計で割勘を再計算して追従させる。
   function handlePaymentChange(userId: string, value: string) {
-    setSaved(false);
     const next = { ...payments, [userId]: value };
     setPayments(next);
     if (equalSplit) {
@@ -109,7 +157,6 @@ export function ItemForm({
 
   // 割勘金額の手入力。等分の自動入力を上書きする意思表示とみなし、等分スイッチを OFF にする。
   function handleShareChange(userId: string, value: string) {
-    setSaved(false);
     setEqualSplit(false);
     setShares((prev) => ({ ...prev, [userId]: value }));
   }
@@ -118,7 +165,6 @@ export function ItemForm({
   // OFF にしたら等分で自動入力された割勘を破棄し、手入力をまっさらな状態から始められるようにする
   // （割勘欄の手入力や「残りをここに」による自動 OFF は手動調整の継続なのでクリアしない）。
   function handleEqualSplitToggle(checked: boolean) {
-    setSaved(false);
     setEqualSplit(checked);
     if (checked) {
       applyEqualSplit(payments);
@@ -133,7 +179,6 @@ export function ItemForm({
     if (deficit === 0) {
       return;
     }
-    setSaved(false);
     setEqualSplit(false);
     setShares((prev) => {
       const next = Math.max(0, parseAmount(prev[userId]) + deficit);
@@ -148,7 +193,6 @@ export function ItemForm({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setSaved(false);
     setSubmitting(true);
     try {
       // 金額 > 0 のメンバー行だけ送る（0 円は保存しない仕様）。
@@ -173,7 +217,8 @@ export function ItemForm({
         setShares(EMPTY);
         setEqualSplit(true);
       }
-      setSaved(true);
+      // 完了フィードバック（SaveCheck）を再生する。連続保存でも毎回再生されるよう連番を進める。
+      setSavedTick((tick) => tick + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
@@ -190,10 +235,7 @@ export function ItemForm({
             type="text"
             required
             value={name}
-            onChange={(e) => {
-              setSaved(false);
-              setName(e.target.value);
-            }}
+            onChange={(e) => setName(e.target.value)}
             placeholder="例: ランチ"
             className="field"
           />
@@ -203,10 +245,7 @@ export function ItemForm({
           <input
             type="date"
             value={purchasedOn}
-            onChange={(e) => {
-              setSaved(false);
-              setPurchasedOn(e.target.value);
-            }}
+            onChange={(e) => setPurchasedOn(e.target.value)}
             className="field"
           />
         </label>
@@ -216,10 +255,7 @@ export function ItemForm({
           <span className="text-sm font-bold">メモ（任意）</span>
           <textarea
             value={memo}
-            onChange={(e) => {
-              setSaved(false);
-              setMemo(e.target.value);
-            }}
+            onChange={(e) => setMemo(e.target.value)}
             placeholder="補足があれば"
             className="field"
           />
@@ -312,11 +348,14 @@ export function ItemForm({
       )}
 
       {error && <p className="note-danger">{error}</p>}
-      {saved && successMessage && <p className="note-ok">{successMessage}</p>}
 
       <button type="submit" disabled={submitting || !canSubmit} className="btn btn-fill w-full">
         {submitLabel}
       </button>
+
+      {/* 保存成功の完了フィードバック。successMessage を指定した画面（連続入力）でのみ表示する。
+          savedTick を key にして保存のたびに再マウントし、エントランスのアニメーションを再生する。 */}
+      {successMessage && savedTick > 0 && <SaveCheck key={savedTick} label={successMessage} />}
     </form>
   );
 }
