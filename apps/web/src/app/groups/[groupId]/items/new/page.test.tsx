@@ -190,7 +190,7 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
     });
   });
 
-  expect(await screen.findByText("保存しました。続けて入力できます。")).toBeInTheDocument();
+  expect(await screen.findByText("保存しました")).toBeInTheDocument();
   expect(screen.getByLabelText("購入品名")).toHaveValue("");
 });
 
@@ -210,7 +210,7 @@ test("等分を OFF にして保存しても、リセット後は等分 ON に�
   await userEvent.click(screen.getByRole("button", { name: "保存" }));
 
   // 連続入力のリセット後はデフォルトの等分 ON に戻る。
-  expect(await screen.findByText("保存しました。続けて入力できます。")).toBeInTheDocument();
+  expect(await screen.findByText("保存しました")).toBeInTheDocument();
   expect(toggle).toBeChecked();
 });
 

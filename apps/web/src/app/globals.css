@@ -143,4 +143,73 @@ body {
   .link-quiet {
     @apply text-sm font-bold text-muted underline underline-offset-4 transition-colors hover:text-ink;
   }
+
+  /* 購入品を保存した直後の完了フィードバック（フローティングのチェックマーク, 購入完了フィードバック案 1b）。
+     画面中央で一瞬だけ保存成功を強く伝え、約 0.7 秒後に自動でフェードアウトする。連続入力を妨げないよう、
+     フェード中はタップを透過させフォーム操作をすぐ再開できるようにする（SaveCheck が状態を管理）。 */
+  .save-check-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center;
+    /* 紙色を薄く敷いてチェックを浮かせる。ライト/ダークいずれの地色にも自然に馴染ませる。 */
+    background: color-mix(in srgb, var(--paper) 55%, transparent);
+    transition: opacity 400ms ease;
+  }
+
+  .save-check-card {
+    @apply flex flex-col items-center gap-3;
+    animation: wk-check-pop 420ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  }
+
+  .save-check-circle {
+    @apply flex h-[76px] w-[76px] items-center justify-center rounded-full;
+    background: var(--accent);
+    box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  /* チェックはアクセント地に紙色で描く（ライト=白抜き / ダーク=暗色抜き）でコントラストを確保。 */
+  .save-check-path {
+    animation: wk-check-draw 420ms 120ms ease forwards;
+  }
+
+  .save-check-label {
+    @apply border px-2.5 py-1 text-sm font-extrabold tracking-wide;
+    border-color: var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+  }
+}
+
+/* 完了フィードバックのアニメーション。ポップ（拡大の弾み）とチェックの描画。 */
+@keyframes wk-check-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes wk-check-draw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* モーション控えめ設定では動きを止め、チェックは即座に描き切った状態で見せる。 */
+@media (prefers-reduced-motion: reduce) {
+  .save-check-card {
+    animation: none;
+  }
+  .save-check-path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }

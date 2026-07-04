@@ -59,7 +59,7 @@ export default function NewItemPage() {
         members={members}
         submitLabel="保存"
         resetAfterSubmit
-        successMessage="保存しました。続けて入力できます。"
+        successMessage="保存しました"
         renderPurchasedOnNote={(purchasedOn) => (
           <PurchasedOnDuplicates groupId={groupId} purchasedOn={purchasedOn} />
         )}
