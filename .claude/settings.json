@@ -18,7 +18,8 @@
   },
   "autoMode": {
     "environment": [
-      "$defaults"
+      "$defaults",
+      "Source control: https://github.com/tom-chiba/warikan-with-nextjs-hono/"
     ]
   },
   "permissions": {
@@ -73,6 +74,27 @@
       "Bash(git switch -f *)",
       "Bash(git switch --force *)",
       "Bash(git switch --discard-changes *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "network": {
+      "allowLocalBinding": true
+    },
+    "filesystem": {
+      "allowWrite": [
+        "~/.claude/plugins/data/",
+        "~/.codex/",
+        "~/Library/Preferences/.wrangler/"
+      ]
+    },
+    "excludedCommands": [
+      "playwright-cli *",
+      "node *codex-companion.mjs*",
+      "git *",
+      "gh *"
     ]
   }
 }
