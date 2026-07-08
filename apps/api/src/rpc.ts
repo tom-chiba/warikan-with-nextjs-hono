@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { groupInvitations } from "./routes/group-invitations";
 import { groups } from "./routes/groups";
 import { groupsCollection } from "./routes/groups-collection";
 import { invitations } from "./routes/invitations";
@@ -11,6 +12,7 @@ export const routes = new Hono()
   .get("/", (c) => c.json({ message: "warikan API" }))
   .route("/groups", groups)
   .route("/groups", groupsCollection)
+  .route("/groups", groupInvitations)
   .route("/groups", items)
   .route("/invitations", invitations);
 
