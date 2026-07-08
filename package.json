@@ -16,9 +16,9 @@
     "format:check": "oxfmt --check"
   },
   "devDependencies": {
-    "@playwright/test": "^1.60.0",
-    "oxfmt": "^0.54.0",
-    "oxlint": "^1.69.0"
+    "@playwright/test": "^1.61.1",
+    "oxfmt": "^0.57.0",
+    "oxlint": "^1.72.0"
   },
   "engines": {
     "node": ">=24"
