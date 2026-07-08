@@ -1,10 +1,9 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api-client";
 import { useGroupMembers } from "@/lib/use-group-members";
-import { ItemForm, type ItemFormValues } from "./groups/[groupId]/items/item-form";
+import { ItemForm } from "./groups/[groupId]/items/item-form";
 import { PurchasedOnDuplicates } from "./groups/[groupId]/items/purchased-on-duplicates";
+import { useCreateItem } from "./groups/[groupId]/items/use-create-item";
 
 // ルートページのクイック入力。グループを指定すると、メンバー取得・保存処理・入力フォームを
 // 自己完結で提供する（/groups/[groupId]/items/new と同等の入力体験を / 上で再現する）。
@@ -13,26 +12,7 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
   // ログイン済みの文脈でのみ描画される前提のため、常に取得する。
   const { data: membersData, isError: membersError } = useGroupMembers(groupId, true);
   const members = membersData?.members ?? [];
-  const queryClient = useQueryClient();
-
-  async function handleSubmit(values: ItemFormValues) {
-    const res = await apiClient.groups[":groupId"].items.$post({
-      param: { groupId },
-      json: values,
-    });
-    if (!res.ok) {
-      const status: number = res.status;
-      throw new Error(
-        status === 401
-          ? "セッションが切れました。再度サインインしてください。"
-          : "購入品の保存に失敗しました",
-      );
-    }
-    // 連続入力では保存後も購入日が今日のまま維持され、PurchasedOnDuplicates が同じキーで
-    // マウントされ続けるため放置すると重複ヒントが保存前のままになる。当該日のクエリを無効化して
-    // 今入れたアイテムを反映させる（日付別に複数キーがありうるので groupId 前方一致で無効化）。
-    await queryClient.invalidateQueries({ queryKey: ["items-on-date", groupId] });
-  }
+  const handleSubmit = useCreateItem(groupId);
 
   return (
     <section className="flex w-full max-w-md flex-col gap-4">
