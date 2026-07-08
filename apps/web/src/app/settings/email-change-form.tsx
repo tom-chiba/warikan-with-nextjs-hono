@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { authClient, verifyEmailCallbackURL } from "@/lib/auth-client";
+import { useAsyncAction } from "@/lib/use-async-action";
 
 // 設定ページのメールアドレス行 + インライン変更フォーム（#61）。
 // 編集中フラグ・入力値・エラー/成功は行内の関心事なのでここに閉じ込め、
@@ -9,8 +10,7 @@ import { authClient, verifyEmailCallbackURL } from "@/lib/auth-client";
 export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy: submitting, error, run, setError } = useAsyncAction();
   const [success, setSuccess] = useState(false);
 
   function startEditing() {
@@ -23,19 +23,22 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await authClient.changeEmail({
-        newEmail: input.trim(),
-        // 確認リンク踏破後の着地先（#69）。検証済みユーザーの変更は新アドレス宛に
-        // 確認リンクを送り、踏破時にこの /verify-email へ戻って変更が確定する。
-        callbackURL: verifyEmailCallbackURL(),
-      });
+    await run(async () => {
+      const res = await authClient
+        .changeEmail({
+          newEmail: input.trim(),
+          // 確認リンク踏破後の着地先（#69）。検証済みユーザーの変更は新アドレス宛に
+          // 確認リンクを送り、踏破時にこの /verify-email へ戻って変更が確定する。
+          callbackURL: verifyEmailCallbackURL(),
+        })
+        .catch(() => {
+          // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
+          // reject の生メッセージは出さず汎用文言に寄せる（従来の catch 節と同じ挙動）。
+          throw new Error("メールアドレスの変更に失敗しました");
+        });
       if (res.error) {
         // 既存メールとの重複は自前の hooks.before が日本語 message で返すため、そのまま表示する。
-        setError(res.error.message ?? "メールアドレスの変更に失敗しました");
-        return;
+        throw new Error(res.error.message ?? "メールアドレスの変更に失敗しました");
       }
       // #69 でメール検証を導入したため、検証済みユーザーの変更は即時反映されず、
       // 新しいアドレス宛に確認リンクが送られる。リンクを踏むまでメールは変わらないので、
@@ -46,12 +49,7 @@ export function EmailChangeForm({ currentEmail }: { currentEmail: string }) {
       //（現メール承認・専用 UI・確定後のキャッシュ更新）は後続 Issue。
       setSuccess(true);
       setEditing(false);
-    } catch {
-      // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
-      setError("メールアドレスの変更に失敗しました");
-    } finally {
-      setSubmitting(false);
-    }
+    }, "メールアドレスの変更に失敗しました");
   }
 
   // 現在と同じメールアドレスは送っても変更にならない（サーバーで 400 になる）ため、

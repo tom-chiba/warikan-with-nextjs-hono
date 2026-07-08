@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { authClient, deleteAccountCallbackURL, signOut } from "@/lib/auth-client";
+import { useAsyncAction } from "@/lib/use-async-action";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { EmailChangeForm } from "./email-change-form";
 import { PasswordChangeForm } from "./password-change-form";
@@ -26,8 +27,7 @@ const PasskeySection = dynamic(() => import("./passkey-section").then((m) => m.P
 export default function SettingsPage() {
   const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { busy: submitting, error, run } = useAsyncAction();
   const [sent, setSent] = useState(false);
 
   if (isPending) return <SessionPending />;
@@ -35,27 +35,25 @@ export default function SettingsPage() {
 
   async function handleRequestDelete(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
+    await run(async () => {
       // #78: パスワード即削除ではなく、確認メールを送る。踏破リンク（/account-deleted 着地）は
       // 発行元と同一セッション前提のため、送信後もサインアウトせずそのまま開いてもらう。
-      const res = await authClient.deleteUser({ callbackURL: deleteAccountCallbackURL() });
+      const res = await authClient
+        .deleteUser({ callbackURL: deleteAccountCallbackURL() })
+        .catch(() => {
+          // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
+          // reject の生メッセージは出さず汎用文言に寄せる（従来の catch 節と同じ挙動）。
+          setSent(false);
+          throw new Error("確認メールの送信に失敗しました");
+        });
       if (res.error) {
         // 再送（sent=true）が失敗したときに成功バナーを残すと、緑の「送信しました」と赤の
         // エラーが同時に出て紛らわしい。失敗時は sent を畳んでエラーだけを示す。
         setSent(false);
-        setError(res.error.message ?? "確認メールの送信に失敗しました");
-        return;
+        throw new Error(res.error.message ?? "確認メールの送信に失敗しました");
       }
       setSent(true);
-    } catch {
-      // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
-      setSent(false);
-      setError("確認メールの送信に失敗しました");
-    } finally {
-      setSubmitting(false);
-    }
+    }, "確認メールの送信に失敗しました");
   }
 
   async function handleSignOut() {
