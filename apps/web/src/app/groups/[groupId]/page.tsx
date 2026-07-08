@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
+import { useAsyncAction } from "@/lib/use-async-action";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useGroups } from "@/lib/use-groups";
 import { useResolvedSession } from "@/lib/use-resolved-session";
@@ -18,9 +19,8 @@ export default function GroupPage() {
   const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
+  const { busy, error, run, setError } = useAsyncAction();
   const [copied, setCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // 現在有効な招待リンク（未失効・期限内）を取得する。
   const { data: inviteData, error: fetchError } = useQuery({
@@ -65,25 +65,17 @@ export default function GroupPage() {
   const groupName = groupsData?.groups.find((g) => g.id === groupId)?.name ?? null;
 
   async function handleGenerate() {
-    setError(null);
-    setBusy(true);
-    try {
+    await run(async () => {
       const res = await apiClient.groups[":groupId"].invitations.$post({ param: { groupId } });
       if (!res.ok) {
         throw new Error("招待リンクの発行に失敗しました");
       }
       await queryClient.invalidateQueries({ queryKey: ["invitation", groupId] });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "招待リンクの発行に失敗しました");
-    } finally {
-      setBusy(false);
-    }
+    }, "招待リンクの発行に失敗しました");
   }
 
   async function handleRevoke(token: string) {
-    setError(null);
-    setBusy(true);
-    try {
+    await run(async () => {
       const res = await apiClient.groups[":groupId"].invitations[":token"].$delete({
         param: { groupId, token },
       });
@@ -91,11 +83,7 @@ export default function GroupPage() {
         throw new Error("招待リンクの無効化に失敗しました");
       }
       await queryClient.invalidateQueries({ queryKey: ["invitation", groupId] });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "招待リンクの無効化に失敗しました");
-    } finally {
-      setBusy(false);
-    }
+    }, "招待リンクの無効化に失敗しました");
   }
 
   async function handleCopy(url: string) {
@@ -122,9 +110,7 @@ export default function GroupPage() {
     if (!window.confirm(message)) {
       return;
     }
-    setError(null);
-    setBusy(true);
-    try {
+    await run(async () => {
       const res = await apiClient.groups[":groupId"].members[":userId"].$delete({
         param: { groupId, userId },
       });
@@ -141,11 +127,7 @@ export default function GroupPage() {
         return;
       }
       await queryClient.invalidateQueries({ queryKey: ["members", groupId] });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "操作に失敗しました");
-    } finally {
-      setBusy(false);
-    }
+    }, "操作に失敗しました");
   }
 
   return (

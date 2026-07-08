@@ -7,6 +7,7 @@ import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
+import { useAsyncAction } from "@/lib/use-async-action";
 import { useGroups } from "@/lib/use-groups";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 
@@ -15,8 +16,7 @@ export default function GroupsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { busy: submitting, error, run } = useAsyncAction();
 
   // 所属グループ一覧。ログイン済みのときだけ取得する。
   // フックは early return より前で必ず呼ぶ（React のフック規則）。
@@ -33,9 +33,7 @@ export default function GroupsPage() {
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
+    await run(async () => {
       const res = await apiClient.groups.$post({ json: { name } });
       if (!res.ok) {
         // requireAuth はミドルウェア適用のため RPC 型に 401 が現れない。
@@ -47,11 +45,7 @@ export default function GroupsPage() {
       // 一覧を最新化してから、作成したグループの画面へ遷移する。
       await queryClient.invalidateQueries({ queryKey: ["groups"] });
       router.push(`/groups/${id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "グループの作成に失敗しました");
-    } finally {
-      setSubmitting(false);
-    }
+    }, "グループの作成に失敗しました");
   }
 
   const groups = groupsData?.groups ?? [];
