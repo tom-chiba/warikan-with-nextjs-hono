@@ -8,6 +8,7 @@ import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
 import { useAsyncAction } from "@/lib/use-async-action";
+import { groupKeys } from "@/lib/query-keys";
 import { useGroups } from "@/lib/use-groups";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 
@@ -43,7 +44,7 @@ export default function GroupsPage() {
       }
       const { id } = await res.json();
       // 一覧を最新化してから、作成したグループの画面へ遷移する。
-      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      await queryClient.invalidateQueries({ queryKey: groupKeys.all() });
       router.push(`/groups/${id}`);
     }, "グループの作成に失敗しました");
   }

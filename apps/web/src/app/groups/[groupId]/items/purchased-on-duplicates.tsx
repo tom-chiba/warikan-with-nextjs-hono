@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { formatAmount } from "@/lib/format";
+import { itemsOnDateKeys } from "@/lib/query-keys";
 
 // 購入日入力時の「これってもう入れたっけ？」確認表示。
 // 指定された購入日（YYYY-MM-DD）に入力済みのアイテム（未精算＋精算済を横断）を取得し、
@@ -23,7 +24,7 @@ export function PurchasedOnDuplicates({
   excludeItemId,
 }: PurchasedOnDuplicatesProps) {
   const { data, isError } = useQuery({
-    queryKey: ["items-on-date", groupId, purchasedOn],
+    queryKey: itemsOnDateKeys.detail(groupId, purchasedOn),
     enabled: !!purchasedOn,
     // 「もう入れたっけ？」の確認は最新の真実が要る。Provider 既定の staleTime（60s）を打ち消し、
     // 購入日を選ぶ／変えるたびに必ず取得し直す（直前の連続入力で増えた分も取りこぼさない）。

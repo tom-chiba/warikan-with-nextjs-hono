@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { apiClient } from "@/lib/api-client";
+import { itemKeys } from "@/lib/query-keys";
 import { ItemsTable } from "./items-table";
 import { useItemActions } from "./use-item-actions";
 
@@ -14,7 +15,7 @@ export function SettledView({ groupId }: { groupId: string }) {
 
   // 精算済アイテム一覧（#23）。
   const { data: itemsData, error: fetchError } = useQuery({
-    queryKey: ["items", groupId, "settled"],
+    queryKey: itemKeys.list(groupId, "settled"),
     queryFn: async () => {
       const res = await apiClient.groups[":groupId"].items.$get({
         param: { groupId },
@@ -47,7 +48,7 @@ export function SettledView({ groupId }: { groupId: string }) {
       // サーバは groupId 一致かつ精算済の id のみ更新する。0 件なら（既に戻された・削除済等で）
       // 一覧が古い可能性が高いので、先に最新化してから警告する（精算実行と同方針）。
       const { unsettled } = await res.json();
-      await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
+      await queryClient.invalidateQueries({ queryKey: itemKeys.byGroup(groupId) });
       if (unsettled.length === 0) {
         throw new Error(
           "対象がありませんでした（既に未精算に戻されたか削除済みの可能性があります）",
