@@ -4,9 +4,9 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { DbVariables, GroupMemberVariables } from "../context";
-import { groupMember, item, itemPayment, itemShare } from "../db/schema";
+import { item, itemPayment, itemShare } from "../db/schema";
 import { loadItemAmounts } from "../lib/item-amounts";
-import { makeRows, sumAmount, validateAmounts } from "../lib/items";
+import { makeRows, toItemResponse, validateItemInput } from "../lib/items";
 
 // メンバーごとの金額入力（支払額・割勘金額の各行）。amount は正の整数（円）。
 // 0 円（支払い／負担なし）の行はそもそも送らない仕様のため positive で弾く。
@@ -33,18 +33,6 @@ const transferEntry = z.object({
   amount: z.number().int().positive(),
 });
 
-// 当該グループの全メンバー userId 集合を返す（payments/shares の userId 検証用）。
-async function groupMemberIds(
-  db: (GroupMemberVariables & DbVariables)["db"],
-  groupId: string,
-): Promise<Set<string>> {
-  const rows = await db
-    .select({ userId: groupMember.userId })
-    .from(groupMember)
-    .where(eq(groupMember.groupId, groupId));
-  return new Set(rows.map((m) => m.userId));
-}
-
 // /groups/:groupId 配下の保護ルート（当該グループのメンバー限定）。
 // 認可ミドルウェア（requireAuth / provideDb / requireGroupMember）は index.ts 側でマウントするため、
 // ここでは Bindings(Env) を持たず Variables だけ型付けする。これにより rpc.ts の AppType に
@@ -58,17 +46,9 @@ export const items = new Hono<{
     const db = c.get("db");
     const { name, purchasedOn, memo, payments, shares } = c.req.valid("json");
 
-    const amountError = validateAmounts(payments, shares);
-    if (amountError) {
-      return c.json({ error: amountError }, 400);
-    }
-
-    // payments / shares の全 userId が当該グループのメンバーであることを検証する
-    //（他グループや非メンバーの userId 混入を防ぐ）。
-    const memberIds = await groupMemberIds(db, member.groupId);
-    const allUserIds = [...payments, ...shares].map((e) => e.userId);
-    if (allUserIds.some((id) => !memberIds.has(id))) {
-      return c.json({ error: "グループに属さないメンバーが含まれています" }, 400);
+    const validationError = await validateItemInput(db, member.groupId, { payments, shares });
+    if (validationError) {
+      return c.json({ error: validationError.error }, validationError.status);
     }
 
     // item + item_payment + item_share を db.batch()（D1 の暗黙の SQL トランザクション = all-or-nothing）で
@@ -129,20 +109,9 @@ export const items = new Hono<{
       const { paymentsByItem, sharesByItem } = await loadItemAmounts(db, ids);
 
       return c.json({
-        items: rows.map((r) => {
-          const itemPayments = paymentsByItem.get(r.id) ?? [];
-          return {
-            id: r.id,
-            name: r.name,
-            purchasedOn: r.purchasedOn ? r.purchasedOn.toISOString() : null,
-            memo: r.memo,
-            status: r.status,
-            // 合計金額 = 支払額合計（Issue #19）。
-            total: sumAmount(itemPayments),
-            payments: itemPayments,
-            shares: sharesByItem.get(r.id) ?? [],
-          };
-        }),
+        items: rows.map((r) =>
+          toItemResponse(r, paymentsByItem.get(r.id) ?? [], sharesByItem.get(r.id) ?? []),
+        ),
       });
     },
   )
@@ -174,16 +143,7 @@ export const items = new Hono<{
     ]);
 
     return c.json({
-      item: {
-        id: row.id,
-        name: row.name,
-        purchasedOn: row.purchasedOn ? row.purchasedOn.toISOString() : null,
-        memo: row.memo,
-        status: row.status,
-        total: sumAmount(payments),
-        payments,
-        shares,
-      },
+      item: toItemResponse(row, payments, shares),
     });
   })
   // 購入品を更新する。バリデーションは保存(POST)と同一。item を更新し、payments / shares は
@@ -194,15 +154,9 @@ export const items = new Hono<{
     const itemId = c.req.param("itemId");
     const { name, purchasedOn, memo, payments, shares } = c.req.valid("json");
 
-    const amountError = validateAmounts(payments, shares);
-    if (amountError) {
-      return c.json({ error: amountError }, 400);
-    }
-
-    const memberIds = await groupMemberIds(db, member.groupId);
-    const allUserIds = [...payments, ...shares].map((e) => e.userId);
-    if (allUserIds.some((id) => !memberIds.has(id))) {
-      return c.json({ error: "グループに属さないメンバーが含まれています" }, 400);
+    const validationError = await validateItemInput(db, member.groupId, { payments, shares });
+    if (validationError) {
+      return c.json({ error: validationError.error }, validationError.status);
     }
 
     // 対象が当該グループの item として存在するか確認する。精算済（settled）アイテムも
