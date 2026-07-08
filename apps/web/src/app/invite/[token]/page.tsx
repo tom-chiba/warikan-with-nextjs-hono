@@ -8,6 +8,7 @@ import { AuthPanel } from "@/app/auth-panel";
 import { VerificationSentNotice } from "@/app/verification-sent-notice";
 import { SessionPending } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
+import { useAsyncAction } from "@/lib/use-async-action";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 
 export default function InvitePage() {
@@ -16,8 +17,7 @@ export default function InvitePage() {
   const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAsyncAction();
   // 招待ページからのサインアップ（#69 の仮登録）後に出す確認メール案内。
   // page.tsx と同じく、セッション再取得の isPending で消えないよう isPending 判定より前に出す。
   const [signedUpEmail, setSignedUpEmail] = useState<string | null>(null);
@@ -88,9 +88,7 @@ export default function InvitePage() {
   }
 
   async function handleJoin() {
-    setError(null);
-    setBusy(true);
-    try {
+    await run(async () => {
       const res = await apiClient.invitations[":token"].accept.$post({ param: { token } });
       if (!res.ok) {
         throw new Error("参加に失敗しました。リンクが無効か期限切れの可能性があります。");
@@ -100,10 +98,7 @@ export default function InvitePage() {
       // その場で再取得まで済ませる。ルート（/）が古い件数でクイック入力を出し分けるのを防ぐ。
       await queryClient.invalidateQueries({ queryKey: ["groups"], refetchType: "all" });
       router.push(`/groups/${groupId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "参加に失敗しました");
-      setBusy(false);
-    }
+    }, "参加に失敗しました");
   }
 
   return (

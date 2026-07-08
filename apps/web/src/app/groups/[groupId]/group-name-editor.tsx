@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { useAsyncAction } from "@/lib/use-async-action";
 
 // グループ詳細ページの見出し。owner にだけグループ名のインライン編集 UI を出す（#65）。
 // member-row.tsx の表示名変更と同じく、編集中フラグ・入力値・保存エラーは
@@ -22,8 +23,7 @@ export function GroupNameEditor({
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [editError, setEditError] = useState<string | null>(null);
+  const { busy: saving, error: editError, run, setError: setEditError } = useAsyncAction();
 
   function startEditing() {
     // 開くたびに現在のグループ名から編集を始める（前回の編集途中の値やエラーを持ち越さない）。
@@ -35,9 +35,7 @@ export function GroupNameEditor({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setEditError(null);
-    setSaving(true);
-    try {
+    await run(async () => {
       const res = await apiClient.groups[":groupId"].$patch({
         param: { groupId },
         json: { name: input.trim() },
@@ -49,11 +47,7 @@ export function GroupNameEditor({
       // ["groups"] キャッシュ経由で参照するため、無効化だけで全箇所に反映される。
       await queryClient.invalidateQueries({ queryKey: ["groups"] });
       setEditing(false);
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : "グループ名の保存に失敗しました");
-    } finally {
-      setSaving(false);
-    }
+    }, "グループ名の保存に失敗しました");
   }
 
   // 見出し（h1）は編集中もページから消さない（スクリーンリーダーの見出しナビゲーションと
