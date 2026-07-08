@@ -3,6 +3,7 @@
 import { type FormEvent, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { passwordRuleErrorMessage } from "@/lib/auth-error";
+import { useAsyncAction } from "@/lib/use-async-action";
 
 // 設定ページのパスワード行 + インライン変更フォーム（#61）。
 // 編集中フラグ・入力値・エラー/成功は行内の関心事なのでここに閉じ込め、
@@ -11,8 +12,7 @@ export function PasswordChangeForm() {
   const [editing, setEditing] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy: submitting, error, run, setError } = useAsyncAction();
   const [success, setSuccess] = useState(false);
 
   function startEditing() {
@@ -26,35 +26,33 @@ export function PasswordChangeForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await authClient.changePassword({
-        currentPassword,
-        newPassword,
-        // パスワード漏えいを疑っての変更を想定し、他の端末のセッションは失効させる。
-        // この端末には新しいセッション Cookie が発行されるためサインインは維持される。
-        revokeOtherSessions: true,
-      });
+    await run(async () => {
+      const res = await authClient
+        .changePassword({
+          currentPassword,
+          newPassword,
+          // パスワード漏えいを疑っての変更を想定し、他の端末のセッションは失効させる。
+          // この端末には新しいセッション Cookie が発行されるためサインインは維持される。
+          revokeOtherSessions: true,
+        })
+        .catch(() => {
+          // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
+          // reject の生メッセージは出さず汎用文言に寄せる（従来の catch 節と同じ挙動）。
+          throw new Error("パスワードの変更に失敗しました");
+        });
       if (res.error) {
         // INVALID_PASSWORD はこの画面固有。長さ規則は reset-password と共通のため共有ヘルパーに委ねる。
-        setError(
+        throw new Error(
           res.error.code === "INVALID_PASSWORD"
             ? "現在のパスワードが正しくありません"
             : (passwordRuleErrorMessage(res.error.code, "新しいパスワード") ??
                 res.error.message ??
                 "パスワードの変更に失敗しました"),
         );
-        return;
       }
       setSuccess(true);
       setEditing(false);
-    } catch {
-      // ネットワーク断等で fetch 自体が reject するケース。HTTP エラーは res.error で返る。
-      setError("パスワードの変更に失敗しました");
-    } finally {
-      setSubmitting(false);
-    }
+    }, "パスワードの変更に失敗しました");
   }
 
   return (
