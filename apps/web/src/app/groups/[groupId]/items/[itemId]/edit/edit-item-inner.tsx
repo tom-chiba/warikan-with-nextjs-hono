@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm, type ItemFormInitial, type ItemFormValues } from "../../item-form";
@@ -61,11 +62,7 @@ export function EditItemInner() {
     });
     if (!res.ok) {
       const status: number = res.status;
-      throw new Error(
-        status === 401
-          ? "セッションが切れました。再度サインインしてください。"
-          : "アイテムの更新に失敗しました",
-      );
+      throw new Error(status === 401 ? SESSION_EXPIRED_MESSAGE : "アイテムの更新に失敗しました");
     }
     // 更新後は一覧・当該アイテムのキャッシュを無効化して元の一覧へ戻る。
     // from は URL パラメータでありアイテムの実際の status と一致する保証がないため、

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
+import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
 import { useGroups } from "@/lib/use-groups";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 
@@ -40,11 +41,7 @@ export default function GroupsPage() {
         // requireAuth はミドルウェア適用のため RPC 型に 401 が現れない。
         // 実行時には返るので number に広げてセッション切れを区別する。
         const status: number = res.status;
-        throw new Error(
-          status === 401
-            ? "セッションが切れました。再度サインインしてください。"
-            : "グループの作成に失敗しました",
-        );
+        throw new Error(status === 401 ? SESSION_EXPIRED_MESSAGE : "グループの作成に失敗しました");
       }
       const { id } = await res.json();
       // 一覧を最新化してから、作成したグループの画面へ遷移する。
