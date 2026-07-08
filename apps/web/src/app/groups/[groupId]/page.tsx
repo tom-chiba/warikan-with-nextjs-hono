@@ -7,6 +7,7 @@ import { useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useAsyncAction } from "@/lib/use-async-action";
+import { groupKeys, invitationKeys, memberKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useGroups } from "@/lib/use-groups";
 import { useResolvedSession } from "@/lib/use-resolved-session";
@@ -24,7 +25,7 @@ export default function GroupPage() {
 
   // 現在有効な招待リンク（未失効・期限内）を取得する。
   const { data: inviteData, error: fetchError } = useQuery({
-    queryKey: ["invitation", groupId],
+    queryKey: invitationKeys.active(groupId),
     enabled: !!session,
     queryFn: async () => {
       const res = await apiClient.groups[":groupId"].invitations.active.$get({
@@ -70,7 +71,7 @@ export default function GroupPage() {
       if (!res.ok) {
         throw new Error("招待リンクの発行に失敗しました");
       }
-      await queryClient.invalidateQueries({ queryKey: ["invitation", groupId] });
+      await queryClient.invalidateQueries({ queryKey: invitationKeys.active(groupId) });
     }, "招待リンクの発行に失敗しました");
   }
 
@@ -82,7 +83,7 @@ export default function GroupPage() {
       if (!res.ok) {
         throw new Error("招待リンクの無効化に失敗しました");
       }
-      await queryClient.invalidateQueries({ queryKey: ["invitation", groupId] });
+      await queryClient.invalidateQueries({ queryKey: invitationKeys.active(groupId) });
     }, "招待リンクの無効化に失敗しました");
   }
 
@@ -122,11 +123,11 @@ export default function GroupPage() {
         // 直後の遷移でこの画面の ["groups"] オブザーバ（見出しの useGroups、#65）が消えるため、
         // オブザーバの状態に依存しない refetchType: "all" でその場で再取得まで済ませる。
         // ルート（/）が退出済みグループのクイック入力を出すのを防ぐ。
-        await queryClient.invalidateQueries({ queryKey: ["groups"], refetchType: "all" });
+        await queryClient.invalidateQueries({ queryKey: groupKeys.all(), refetchType: "all" });
         router.push("/groups");
         return;
       }
-      await queryClient.invalidateQueries({ queryKey: ["members", groupId] });
+      await queryClient.invalidateQueries({ queryKey: memberKeys.byGroup(groupId) });
     }, "操作に失敗しました");
   }
 

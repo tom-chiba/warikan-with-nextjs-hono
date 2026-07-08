@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { useSession } from "@/lib/auth-client";
+import { groupKeys } from "@/lib/query-keys";
 
 // セッションのユーザーが居なくなった・切り替わったタイミングで Query キャッシュを丸ごと破棄する。
 // サインアウトボタンなど個別の経路に処理を持たせず、セッション状態の変化そのものに反応することで、
@@ -25,7 +26,7 @@ export function SessionCacheBoundary() {
     // invalidate でクッキー付きの再取得を促す。セッション解決前に発火するクエリは groups だけ
     // なので、対象もそれに絞る（将来別の先行クエリを足す場合はここに追記する）。
     if (prevUserIdRef.current === null && userId !== null) {
-      queryClient.invalidateQueries({ queryKey: ["groups"] });
+      queryClient.invalidateQueries({ queryKey: groupKeys.all() });
     }
     prevUserIdRef.current = userId;
   }, [userId, queryClient]);

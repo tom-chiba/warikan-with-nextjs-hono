@@ -8,6 +8,7 @@ import { AuthPanel } from "@/app/auth-panel";
 import { VerificationSentNotice } from "@/app/verification-sent-notice";
 import { SessionPending } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
+import { groupKeys, invitationPreviewKeys } from "@/lib/query-keys";
 import { useAsyncAction } from "@/lib/use-async-action";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 
@@ -35,7 +36,7 @@ export default function InvitePage() {
     isError: previewError,
     refetch: refetchPreview,
   } = useQuery({
-    queryKey: ["invitation-preview", token],
+    queryKey: invitationPreviewKeys.detail(token),
     enabled: !!session,
     queryFn: async () => {
       const res = await apiClient.invitations[":token"].$get({ param: { token } });
@@ -96,7 +97,7 @@ export default function InvitePage() {
       const { groupId } = await res.json();
       // この画面では ["groups"] のオブザーバが居ない（非アクティブ）ため、refetchType: "all" で
       // その場で再取得まで済ませる。ルート（/）が古い件数でクイック入力を出し分けるのを防ぐ。
-      await queryClient.invalidateQueries({ queryKey: ["groups"], refetchType: "all" });
+      await queryClient.invalidateQueries({ queryKey: groupKeys.all(), refetchType: "all" });
       router.push(`/groups/${groupId}`);
     }, "参加に失敗しました");
   }

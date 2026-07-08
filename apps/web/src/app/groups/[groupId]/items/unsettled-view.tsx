@@ -6,6 +6,7 @@ import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { computeSettlements } from "@warikan/domain";
 import { formatAmount } from "@/lib/format";
+import { itemKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemsTable } from "./items-table";
 import { useItemActions } from "./use-item-actions";
@@ -21,7 +22,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
 
   // 未精算アイテム一覧（#19）。各 item に合計金額・payments・shares を含む。
   const { data: itemsData, error: fetchError } = useQuery({
-    queryKey: ["items", groupId, "unsettled"],
+    queryKey: itemKeys.list(groupId, "unsettled"),
     queryFn: async () => {
       const res = await apiClient.groups[":groupId"].items.$get({
         param: { groupId },
@@ -104,7 +105,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
       // 409 = 一覧が古い・送金リスト不一致。先に一覧を最新化してからサーバーの理由を表示する。
       if (res.status === 409) {
         const body = await res.json();
-        await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
+        await queryClient.invalidateQueries({ queryKey: itemKeys.byGroup(groupId) });
         throw new Error("error" in body ? body.error : "精算に失敗しました");
       }
       if (!res.ok) {
@@ -115,7 +116,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
       // サーバは groupId 一致かつ未精算の id のみ更新する。0 件なら（既に精算済・削除済等で）
       // 一覧が古い可能性が高いので、先に最新化してから警告する。
       const { settled } = await res.json();
-      await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
+      await queryClient.invalidateQueries({ queryKey: itemKeys.byGroup(groupId) });
       if (settled.length === 0) {
         throw new Error("精算対象がありませんでした（既に精算済みか削除済みの可能性があります）");
       }

@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { groupKeys } from "@/lib/query-keys";
 import { useAsyncAction } from "@/lib/use-async-action";
 
 // グループ詳細ページの見出し。owner にだけグループ名のインライン編集 UI を出す（#65）。
@@ -45,7 +46,7 @@ export function GroupNameEditor({
       }
       // グループ名はこの見出し・グループ一覧・ルートのクイック入力が
       // ["groups"] キャッシュ経由で参照するため、無効化だけで全箇所に反映される。
-      await queryClient.invalidateQueries({ queryKey: ["groups"] });
+      await queryClient.invalidateQueries({ queryKey: groupKeys.all() });
       setEditing(false);
     }, "グループ名の保存に失敗しました");
   }

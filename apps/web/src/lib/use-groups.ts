@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { apiClient, UnauthorizedError } from "@/lib/api-client";
+import { groupKeys, memberKeys } from "@/lib/query-keys";
 
 // ["members", groupId] キャッシュの値の型。members エンドポイントのレスポンス型から導出し、
 // シードする形がエンドポイント側の変更とずれたらコンパイルエラーになるようにする。
@@ -15,7 +16,7 @@ type MembersData = InferResponseType<(typeof apiClient.groups)[":groupId"]["memb
 export function useGroups(enabled: boolean) {
   const queryClient = useQueryClient();
   return useQuery({
-    queryKey: ["groups"],
+    queryKey: groupKeys.all(),
     enabled,
     queryFn: async () => {
       const res = await apiClient.groups.$get();
@@ -34,8 +35,8 @@ export function useGroups(enabled: boolean) {
       // members キャッシュへ遅れて着弾して上書きする競合を避ける（初期表示の往復削減には
       // 「空のとき」だけで十分）。
       const seed = data.currentGroupMembers;
-      if (seed && queryClient.getQueryData(["members", seed.groupId]) === undefined) {
-        queryClient.setQueryData<MembersData>(["members", seed.groupId], {
+      if (seed && queryClient.getQueryData(memberKeys.byGroup(seed.groupId)) === undefined) {
+        queryClient.setQueryData<MembersData>(memberKeys.byGroup(seed.groupId), {
           members: seed.members,
         });
       }

@@ -2,6 +2,7 @@ import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import type { InferResponseType } from "hono/client";
 import { useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
+import { groupKeys } from "@/lib/query-keys";
 import { useGroups } from "@/lib/use-groups";
 
 // GET /groups のレスポンス型は RPC から導出し、サーバー側の形変更に型レベルで追従する。
@@ -23,7 +24,7 @@ export function resolveCurrentGroup(
 // 次回以降の解決を良くするための楽観的な書き込みで、失敗しても現在の表示には影響しないため
 // 握りつぶす（fire-and-forget）。
 export function setCurrentGroup(queryClient: QueryClient, groupId: string) {
-  queryClient.setQueryData(["groups"], (old: GroupsData | undefined) =>
+  queryClient.setQueryData(groupKeys.all(), (old: GroupsData | undefined) =>
     old ? { ...old, currentGroupId: groupId } : old,
   );
   apiClient.groups[":groupId"]["last-viewed"].$put({ param: { groupId } }).catch(() => {
@@ -53,7 +54,7 @@ export function useMarkGroupViewed(groupId: string, enabled: boolean) {
     if (!enabled || !groupsLoaded || !isMember) {
       return;
     }
-    const cached = queryClient.getQueryData<GroupsData>(["groups"]);
+    const cached = queryClient.getQueryData<GroupsData>(groupKeys.all());
     if (!cached || cached.currentGroupId === groupId) {
       return;
     }

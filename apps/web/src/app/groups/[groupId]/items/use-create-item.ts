@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
+import { itemsOnDateKeys } from "@/lib/query-keys";
 import type { ItemFormValues } from "./item-form";
 
 // 購入品の保存処理（メイン機能）。ルートのクイック入力（quick-item-entry）と
@@ -23,6 +24,6 @@ export function useCreateItem(groupId: string) {
     // 連続入力では保存後も購入日が今日のまま維持され、PurchasedOnDuplicates が同じキーで
     // マウントされ続けるため放置すると重複ヒントが保存前のままになる。当該日のクエリを無効化して
     // 今入れたアイテムを反映させる（日付別に複数キーがありうるので groupId 前方一致で無効化）。
-    await queryClient.invalidateQueries({ queryKey: ["items-on-date", groupId] });
+    await queryClient.invalidateQueries({ queryKey: itemsOnDateKeys.byGroup(groupId) });
   };
 }

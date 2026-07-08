@@ -3,6 +3,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
+import { memberKeys } from "@/lib/query-keys";
 import { useAsyncAction } from "@/lib/use-async-action";
 
 // メンバー一覧の 1 行。自分の行にだけグループ内表示名のインライン編集 UI を出す（#64）。
@@ -59,7 +60,7 @@ export function MemberRow({
       }
       // 表示名はメンバー一覧・支払/負担ラベル・送金リストの全画面が
       // ["members", groupId] キャッシュ経由で参照するため、無効化だけで全箇所に反映される。
-      await queryClient.invalidateQueries({ queryKey: ["members", groupId] });
+      await queryClient.invalidateQueries({ queryKey: memberKeys.byGroup(groupId) });
       setEditing(false);
     }, "表示名の保存に失敗しました");
   }

@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { itemKeys } from "@/lib/query-keys";
 import { useAsyncAction } from "@/lib/use-async-action";
 
 // 未精算・精算済の両ビューで共有するミューテーション基盤。
@@ -24,7 +25,7 @@ export function useItemActions(groupId: string, status: "unsettled" | "settled")
         throw new Error("アイテムの削除に失敗しました");
       }
       onDeleted?.();
-      await queryClient.invalidateQueries({ queryKey: ["items", groupId, status] });
+      await queryClient.invalidateQueries({ queryKey: itemKeys.list(groupId, status) });
     }, "アイテムの削除に失敗しました");
   }
 

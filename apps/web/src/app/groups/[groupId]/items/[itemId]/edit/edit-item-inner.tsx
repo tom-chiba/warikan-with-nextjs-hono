@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
+import { itemKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm, type ItemFormInitial, type ItemFormValues } from "../../item-form";
@@ -28,7 +29,7 @@ export function EditItemInner() {
 
   // 編集対象の購入品（payments / shares を含む単一取得）。
   const { data: itemData, error: fetchError } = useQuery({
-    queryKey: ["item", groupId, itemId],
+    queryKey: itemKeys.detail(groupId, itemId),
     enabled: !!session,
     queryFn: async () => {
       const res = await apiClient.groups[":groupId"].items[":itemId"].$get({
@@ -67,8 +68,8 @@ export function EditItemInner() {
     // 更新後は一覧・当該アイテムのキャッシュを無効化して元の一覧へ戻る。
     // from は URL パラメータでありアイテムの実際の status と一致する保証がないため、
     // 前方一致（["items", groupId]）で未精算・精算済の両一覧を無効化する。
-    await queryClient.invalidateQueries({ queryKey: ["items", groupId] });
-    await queryClient.invalidateQueries({ queryKey: ["item", groupId, itemId] });
+    await queryClient.invalidateQueries({ queryKey: itemKeys.byGroup(groupId) });
+    await queryClient.invalidateQueries({ queryKey: itemKeys.detail(groupId, itemId) });
     router.push(listPath);
   }
 
