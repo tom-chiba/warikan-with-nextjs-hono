@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { NAME_MAX_LENGTH } from "@warikan/domain";
 import { and, eq, notExists } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -20,7 +21,7 @@ export const groups = new Hono<{
   // updated_at は $defaultFn が INSERT 時にしか効かないため UPDATE で明示的に更新する。
   .patch(
     "/:groupId",
-    zValidator("json", z.object({ name: z.string().trim().min(1).max(100) })),
+    zValidator("json", z.object({ name: z.string().trim().min(1).max(NAME_MAX_LENGTH) })),
     async (c) => {
       const member = c.get("groupMember");
       const db = c.get("db");
@@ -67,7 +68,7 @@ export const groups = new Hono<{
   // 空・空白のみは trim 後の min(1) で弾く。クリア（null に戻す）操作は提供しない。
   .put(
     "/:groupId/members/me/display-name",
-    zValidator("json", z.object({ displayName: z.string().trim().min(1).max(100) })),
+    zValidator("json", z.object({ displayName: z.string().trim().min(1).max(NAME_MAX_LENGTH) })),
     async (c) => {
       const member = c.get("groupMember");
       const db = c.get("db");

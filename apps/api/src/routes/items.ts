@@ -1,5 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import { computeSettlements, transfersEqual } from "@warikan/domain";
+import {
+  computeSettlements,
+  MEMO_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+  transfersEqual,
+} from "@warikan/domain";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -18,9 +23,9 @@ const amountEntry = z.object({
 // 購入品の保存・更新の入力。purchasedOn は input type="date" の値（"YYYY-MM-DD"）。
 // 購入日・メモは任意（未入力なら null 相当）。新規(POST)・更新(PUT)で共通。
 const itemSchema = z.object({
-  name: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   purchasedOn: z.iso.date().nullish(),
-  memo: z.string().max(500).nullish(),
+  memo: z.string().max(MEMO_MAX_LENGTH).nullish(),
   payments: z.array(amountEntry),
   shares: z.array(amountEntry),
 });

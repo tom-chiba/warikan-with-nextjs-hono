@@ -1,7 +1,12 @@
 "use client";
 
 import { type FormEvent, type ReactNode, useEffect, useState } from "react";
-import { distributeEqually } from "@warikan/domain";
+import {
+  amountsBalanced,
+  distributeEqually,
+  MEMO_MAX_LENGTH,
+  NAME_MAX_LENGTH,
+} from "@warikan/domain";
 import { todayLocal } from "@/lib/date";
 import { formatAmount } from "@/lib/format";
 
@@ -187,8 +192,9 @@ export function ItemForm({
   }
 
   const nameValid = name.trim().length > 0;
-  // 保存可能条件: 品名あり・支払額合計 > 0・支払額合計 = 割勘金額合計。
-  const canSubmit = nameValid && paymentTotal > 0 && paymentTotal === shareTotal;
+  // 保存可能条件: 品名あり・金額整合（支払額合計 > 0・支払額合計 = 割勘金額合計）。
+  // 金額整合の判定は domain の amountsBalanced（BE の validateAmounts と同一ルール）を参照する。
+  const canSubmit = nameValid && amountsBalanced(paymentTotal, shareTotal);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -234,6 +240,7 @@ export function ItemForm({
           <input
             type="text"
             required
+            maxLength={NAME_MAX_LENGTH}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="例: ランチ"
@@ -256,6 +263,7 @@ export function ItemForm({
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
+            maxLength={MEMO_MAX_LENGTH}
             placeholder="補足があれば"
             className="field"
           />

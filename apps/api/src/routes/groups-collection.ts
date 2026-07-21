@@ -1,4 +1,5 @@
 import { zValidator } from "@hono/zod-validator";
+import { NAME_MAX_LENGTH } from "@warikan/domain";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
@@ -16,7 +17,7 @@ export const groupsCollection = new Hono<{
 }>()
   .post(
     "/",
-    zValidator("json", z.object({ name: z.string().trim().min(1).max(100) })),
+    zValidator("json", z.object({ name: z.string().trim().min(1).max(NAME_MAX_LENGTH) })),
     async (c) => {
       const { name } = c.req.valid("json");
       const user = c.get("user");
