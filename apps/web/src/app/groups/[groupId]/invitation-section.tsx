@@ -47,10 +47,12 @@ export function InvitationSection({ groupId }: { groupId: string }) {
     }, "招待リンクの発行に失敗しました");
   }
 
-  async function handleRevoke(token: string) {
+  async function handleRevoke() {
+    // 無効化ボタンは inviteUrl（= invitation あり）のときだけ描画されるため、ここでは必ず存在する。
+    if (!invitation) return;
     await run(async () => {
       const res = await apiClient.groups[":groupId"].invitations[":token"].$delete({
-        param: { groupId, token },
+        param: { groupId, token: invitation.token },
       });
       if (!res.ok) {
         throw new Error("招待リンクの無効化に失敗しました");
@@ -96,7 +98,7 @@ export function InvitationSection({ groupId }: { groupId: string }) {
             <button
               type="button"
               disabled={busy}
-              onClick={() => invitation && handleRevoke(invitation.token)}
+              onClick={handleRevoke}
               className="btn btn-line-danger"
             >
               無効化
