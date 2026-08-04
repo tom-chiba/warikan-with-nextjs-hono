@@ -19,7 +19,7 @@
     "@warikan/domain": "workspace:*",
     "better-auth": "^1.6.23",
     "hono": "^4.12.28",
-    "next": "16.2.10",
+    "next": "16.2.11",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
