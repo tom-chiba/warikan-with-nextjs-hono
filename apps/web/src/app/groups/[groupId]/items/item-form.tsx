@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useState } from "react";
 import {
   amountsBalanced,
   distributeEqually,
@@ -9,6 +9,8 @@ import {
 } from "@warikan/domain";
 import { todayLocal } from "@/lib/date";
 import { formatAmount } from "@/lib/format";
+import { AmountInputList } from "./amount-input-list";
+import { SaveCheck } from "./save-check";
 
 // 購入品の入力フォーム（新規 #4 / 編集 #20 で共通利用）。
 // 支払額・割勘金額の入力、等分、「残りをここに」、合計・過不足表示、保存可否の判定を内包する。
@@ -47,53 +49,6 @@ type ItemFormProps = {
   renderPurchasedOnNote?: (purchasedOn: string) => ReactNode;
   onSubmit: (values: ItemFormValues) => Promise<void>;
 };
-
-// 保存成功時に画面中央で一瞬だけ出す完了フィードバック（購入完了フィードバック案 1b）。
-// 親側が保存のたびに key を変えて再マウントすることでエントランスを再生する。マウントから約 0.7 秒後に
-// フェードアウトし、フェード（0.4 秒）後に DOM から外れる。日常の連続入力を妨げないよう、フェード中は
-// タップを透過させ、表示中はタップで即座に閉じられるようにする。
-function SaveCheck({ label }: { label: string }) {
-  // マウント直後は shown。0.7 秒後に fading、さらにフェード完了後 hidden。
-  const [phase, setPhase] = useState<"shown" | "fading" | "hidden">("shown");
-
-  useEffect(() => {
-    // setState はいずれもタイマーのコールバック内（＝非同期）で行い、effect 本体では呼ばない。
-    const hide = setTimeout(() => setPhase("fading"), 700);
-    const remove = setTimeout(() => setPhase("hidden"), 700 + 400);
-    return () => {
-      clearTimeout(hide);
-      clearTimeout(remove);
-    };
-  }, []);
-
-  if (phase === "hidden") {
-    return null;
-  }
-
-  const fading = phase === "fading";
-  return (
-    // 自動で消える一時的な確認表示。タップは常に下のフォームへ透過させ（backdrop は pointer-events:none）、
-    // 保存直後にすぐ次の入力欄へ触れられるようにする。早閉じは行わず自動フェードのみで消す。
-    <div className="save-check-backdrop" style={{ opacity: fading ? 0 : 1 }} aria-hidden={fading}>
-      <div className="save-check-card" role="status">
-        <span className="save-check-circle">
-          <svg width="34" height="28" viewBox="0 0 34 28" fill="none" aria-hidden="true">
-            <path
-              d="M3 14L13 24L31 3"
-              stroke="var(--paper)"
-              strokeWidth="3.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray="40"
-              className="save-check-path"
-            />
-          </svg>
-        </span>
-        <span className="save-check-label">{label}</span>
-      </div>
-    </div>
-  );
-}
 
 // 入力欄の文字列を金額（正の整数・円）に変換する。未入力・小数・負数・0・非数値は 0 とみなす。
 // type="number" は "1e2"（=100）等の指数表記を有効値として返すため、parseInt ではなく Number で
@@ -281,23 +236,12 @@ export function ItemForm({
                 合計 {formatAmount(paymentTotal)} 円
               </span>
             </div>
-            <ul className="flex flex-col gap-2">
-              {members.map((m) => (
-                <li key={m.userId} className="flex items-center justify-between gap-3">
-                  <span className="truncate">{m.name}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    inputMode="numeric"
-                    aria-label={`${m.name} の支払額`}
-                    value={payments[m.userId] ?? ""}
-                    onChange={(e) => handlePaymentChange(m.userId, e.target.value)}
-                    className="field w-32 text-right tabular-nums"
-                  />
-                </li>
-              ))}
-            </ul>
+            <AmountInputList
+              members={members}
+              values={payments}
+              labelSuffix="の支払額"
+              onChange={handlePaymentChange}
+            />
           </section>
 
           <section className="flex flex-col gap-3">
@@ -316,35 +260,24 @@ export function ItemForm({
               />
               <span>等分（支払額合計を人数で等分し、端数は自動で振り分け）</span>
             </label>
-            <ul className="flex flex-col gap-2">
-              {members.map((m) => (
-                <li key={m.userId} className="flex items-center justify-between gap-3">
-                  <span className="truncate">{m.name}</span>
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      inputMode="numeric"
-                      aria-label={`${m.name} の割勘金額`}
-                      value={shares[m.userId] ?? ""}
-                      onChange={(e) => handleShareChange(m.userId, e.target.value)}
-                      className="field w-32 text-right tabular-nums"
-                    />
-                    <button
-                      type="button"
-                      // 不足（deficit > 0）のときだけ活性。一致・超過時は「残りを加算」の意味を持たないため無効。
-                      disabled={deficit <= 0}
-                      onClick={() => handleFillRemainder(m.userId)}
-                      className="btn btn-line btn-sm shrink-0"
-                      title="不足分をこのメンバーに加算"
-                    >
-                      残りをここに
-                    </button>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <AmountInputList
+              members={members}
+              values={shares}
+              labelSuffix="の割勘金額"
+              onChange={handleShareChange}
+              renderRowEnd={(userId) => (
+                <button
+                  type="button"
+                  // 不足（deficit > 0）のときだけ活性。一致・超過時は「残りを加算」の意味を持たないため無効。
+                  disabled={deficit <= 0}
+                  onClick={() => handleFillRemainder(userId)}
+                  className="btn btn-line btn-sm shrink-0"
+                  title="不足分をこのメンバーに加算"
+                >
+                  残りをここに
+                </button>
+              )}
+            />
             {/* 過不足の表示。0 なら一致。 */}
             {deficit !== 0 && (
               <p className="text-sm font-medium tabular-nums text-warn">
