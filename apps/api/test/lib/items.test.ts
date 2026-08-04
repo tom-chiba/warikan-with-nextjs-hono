@@ -1,42 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { groupByItem, makeRows, sumAmount, validateAmounts } from "../../src/lib/items";
+import { groupByItem, makeRows } from "../../src/lib/items";
 
-describe("sumAmount", () => {
-  it("amount を合算する（空配列は 0）", () => {
-    expect(sumAmount([{ amount: 100 }, { amount: 250 }])).toBe(350);
-    expect(sumAmount([])).toBe(0);
-  });
-});
-
-describe("validateAmounts", () => {
-  const a = (userId: string, amount: number) => ({ userId, amount });
-
-  it("支払額合計 = 割勘金額合計なら null（妥当）", () => {
-    expect(validateAmounts([a("u1", 1000)], [a("u1", 500), a("u2", 500)])).toBeNull();
-  });
-
-  it("合計が一致しなければエラーメッセージ", () => {
-    expect(validateAmounts([a("u1", 1000)], [a("u1", 900)])).toBe(
-      "支払額合計と割勘金額合計が一致していません",
-    );
-  });
-
-  it("合計 0 円はエラー（空の購入品は保存しない）", () => {
-    expect(validateAmounts([], [])).toBe("支払額合計と割勘金額合計が一致していません");
-  });
-
-  it("payments 内の同一メンバー重複はエラー", () => {
-    expect(validateAmounts([a("u1", 500), a("u1", 500)], [a("u2", 1000)])).toBe(
-      "同一メンバーが重複しています",
-    );
-  });
-
-  it("shares 内の同一メンバー重複はエラー", () => {
-    expect(validateAmounts([a("u1", 1000)], [a("u2", 500), a("u2", 500)])).toBe(
-      "同一メンバーが重複しています",
-    );
-  });
-});
+// sumAmount / validateAmounts は packages/domain へ移管したため、そのテストは
+// packages/domain/src/amounts.test.ts にある（ここでは lib/items 固有の関数のみ検証する）。
 
 describe("groupByItem", () => {
   it("itemId をキーに金額行をまとめる", () => {

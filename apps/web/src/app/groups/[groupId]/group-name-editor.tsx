@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { NAME_MAX_LENGTH } from "@warikan/domain";
 import { useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { groupKeys } from "@/lib/query-keys";
@@ -73,7 +74,7 @@ export function GroupNameEditor({
           <input
             type="text"
             aria-label="グループ名"
-            maxLength={100}
+            maxLength={NAME_MAX_LENGTH}
             // ボタン押下で開く編集フォームなので、開いた直後に入力へフォーカスを移す。
             autoFocus
             value={input}
