@@ -1,17 +1,17 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { useAsyncAction } from "@/lib/use-async-action";
-import { groupKeys, invitationKeys, memberKeys } from "@/lib/query-keys";
+import { groupKeys, memberKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useGroups } from "@/lib/use-groups";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { GroupNameEditor } from "./group-name-editor";
+import { InvitationSection } from "./invitation-section";
 import { MemberRow } from "./member-row";
 
 export default function GroupPage() {
@@ -20,23 +20,7 @@ export default function GroupPage() {
   const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { busy, error, run, setError } = useAsyncAction();
-  const [copied, setCopied] = useState(false);
-
-  // 現在有効な招待リンク（未失効・期限内）を取得する。
-  const { data: inviteData, error: fetchError } = useQuery({
-    queryKey: invitationKeys.active(groupId),
-    enabled: !!session,
-    queryFn: async () => {
-      const res = await apiClient.groups[":groupId"].invitations.active.$get({
-        param: { groupId },
-      });
-      if (!res.ok) {
-        throw new Error("招待リンクの取得に失敗しました");
-      }
-      return res.json();
-    },
-  });
+  const { busy, error, run } = useAsyncAction();
 
   // メンバー一覧を取得する。
   const { data: membersData } = useGroupMembers(groupId, !!session);
@@ -53,51 +37,11 @@ export default function GroupPage() {
     return <SignInPrompt />;
   }
 
-  const invitation = inviteData?.invitation ?? null;
-  const inviteUrl =
-    invitation && typeof window !== "undefined"
-      ? `${window.location.origin}/invite/${invitation.token}`
-      : null;
-
   const members = membersData?.members ?? [];
   const currentUserId = session.user.id;
   const isOwner = members.some((m) => m.userId === currentUserId && m.role === "owner");
   // キャッシュ未着の間は null（見出しは固定テキスト「グループ」にフォールバック）。
   const groupName = groupsData?.groups.find((g) => g.id === groupId)?.name ?? null;
-
-  async function handleGenerate() {
-    await run(async () => {
-      const res = await apiClient.groups[":groupId"].invitations.$post({ param: { groupId } });
-      if (!res.ok) {
-        throw new Error("招待リンクの発行に失敗しました");
-      }
-      await queryClient.invalidateQueries({ queryKey: invitationKeys.active(groupId) });
-    }, "招待リンクの発行に失敗しました");
-  }
-
-  async function handleRevoke(token: string) {
-    await run(async () => {
-      const res = await apiClient.groups[":groupId"].invitations[":token"].$delete({
-        param: { groupId, token },
-      });
-      if (!res.ok) {
-        throw new Error("招待リンクの無効化に失敗しました");
-      }
-      await queryClient.invalidateQueries({ queryKey: invitationKeys.active(groupId) });
-    }, "招待リンクの無効化に失敗しました");
-  }
-
-  async function handleCopy(url: string) {
-    setError(null);
-    try {
-      // クリップボード API は非安全オリジンや権限拒否で reject されうるため捕捉する。
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError("コピーに失敗しました。リンクを手動で選択してコピーしてください。");
-    }
-  }
 
   async function handleRemove(userId: string, isSelf: boolean, name: string) {
     // 退出・削除は取り消せない破壊的操作なので確認を挟む。
@@ -141,52 +85,10 @@ export default function GroupPage() {
         </p>
       </div>
 
-      {/* 招待リンク取得失敗・各操作のエラーをここに集約表示する。 */}
-      {(error || fetchError) && (
-        <p className="note-danger w-full">
-          {error ??
-            (fetchError instanceof Error ? fetchError.message : "招待リンクの取得に失敗しました")}
-        </p>
-      )}
+      {/* メンバー削除・退出のエラーをここに表示する（招待リンクのエラーは InvitationSection 内に表示）。 */}
+      {error && <p className="note-danger w-full">{error}</p>}
 
-      <section className="flex w-full flex-col gap-3">
-        <h2 className="section-title section-rule">招待リンク</h2>
-        {inviteUrl ? (
-          <div className="flex flex-col gap-2">
-            <p className="note-muted">
-              このリンクを共有するとメンバーを招待できます（有効期限あり）。
-            </p>
-            <code className="break-all border border-rule bg-ink/5 px-3 py-2 font-mono text-xs">
-              {inviteUrl}
-            </code>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => handleCopy(inviteUrl)} className="btn btn-line">
-                {copied ? "コピーしました" : "コピー"}
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => invitation && handleRevoke(invitation.token)}
-                className="btn btn-line-danger"
-              >
-                無効化
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleGenerate}
-                className="btn btn-line"
-              >
-                再発行
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" disabled={busy} onClick={handleGenerate} className="btn btn-fill">
-            招待リンクを発行
-          </button>
-        )}
-      </section>
+      <InvitationSection groupId={groupId} />
 
       <section className="flex w-full flex-col gap-3">
         <h2 className="section-title section-rule">メンバー</h2>
