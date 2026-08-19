@@ -1,3 +1,4 @@
+import { ITEM_KINDS } from "@warikan/domain";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Better Auth のコアスキーマ（メール + パスワード）を Drizzle(SQLite/D1) で定義する。
@@ -172,7 +173,8 @@ export const groupInvitation = sqliteTable(
   (t) => [index("group_invitation_group_id_revoked_at_idx").on(t.groupId, t.revokedAt)],
 );
 
-// 購入品。status は未精算/精算済の 2 状態。
+// 購入品。status は未精算/精算済の 2 状態。kind は支出（割り勘）/収入（分配）の 2 種類
+//（収入分配機能）。income では payments=受取額、shares=分担額として役割が反転する。
 export const item = sqliteTable(
   "item",
   {
@@ -188,6 +190,7 @@ export const item = sqliteTable(
     status: text("status", { enum: ["unsettled", "settled"] })
       .notNull()
       .default("unsettled"),
+    kind: text("kind", { enum: ITEM_KINDS }).notNull().default("expense"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .$defaultFn(() => new Date())
       .notNull(),

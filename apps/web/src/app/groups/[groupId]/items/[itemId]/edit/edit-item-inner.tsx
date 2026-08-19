@@ -3,9 +3,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import type { ItemKind } from "@warikan/domain";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
+import { itemKindNoun } from "@/lib/item-kind";
 import { itemKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
@@ -26,6 +29,9 @@ export function EditItemInner() {
   const { data: session, isPending } = useResolvedSession();
   const router = useRouter();
   const queryClient = useQueryClient();
+  // ItemForm 内部の切替（支出/収入）に見出し文言を追従させる。初期値は読み込んだアイテムの
+  // kind（未ロード時は expense）で、null は「ItemForm 側でまだ上書きされていない」を表す。
+  const [kindOverride, setKindOverride] = useState<ItemKind | null>(null);
 
   // 編集対象の購入品（payments / shares を含む単一取得）。
   const { data: itemData, error: fetchError } = useQuery({
@@ -82,16 +88,18 @@ export function EditItemInner() {
         name: item.name,
         purchasedOn: item.purchasedOn ? item.purchasedOn.slice(0, 10) : "",
         memo: item.memo ?? "",
+        kind: item.kind,
         payments: toRecord(item.payments),
         shares: toRecord(item.shares),
       }
     : undefined;
+  const kind = kindOverride ?? item?.kind ?? "expense";
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-6">
       <div className="flex flex-col gap-1">
         <span className="kicker">Edit Item</span>
-        <h1 className="headline">購入品を編集</h1>
+        <h1 className="headline">{itemKindNoun(kind)}を編集</h1>
       </div>
 
       {fetchError && (
@@ -113,6 +121,7 @@ export function EditItemInner() {
               excludeItemId={itemId}
             />
           )}
+          onKindChange={setKindOverride}
           onSubmit={handleSubmit}
         />
       ) : (

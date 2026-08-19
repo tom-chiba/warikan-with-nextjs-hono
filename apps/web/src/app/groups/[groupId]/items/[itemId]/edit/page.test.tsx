@@ -71,6 +71,7 @@ const item = {
     purchasedOn: "2026-06-01T00:00:00.000Z",
     memo: "駅前",
     status: "unsettled",
+    kind: "expense",
     total: 1000,
     payments: [{ userId: "owner", amount: 1000 }],
     shares: [
@@ -101,6 +102,58 @@ test("既存値がフォームにプリフィルされる", async () => {
   expect(screen.getByDisplayValue("駅前")).toBeInTheDocument();
   // owner の支払額に 1000 が入っている。
   expect(screen.getByLabelText("オーナー の支払額")).toHaveValue(1000);
+});
+
+test("income アイテムを読み込むと見出し・トグルが収入側で表示される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ item: { ...item.item, kind: "income" } }),
+  });
+  membersGetMock.mockResolvedValue({ ok: true, json: async () => members });
+
+  renderWithClient(<EditItemPage />);
+
+  expect(await screen.findByRole("heading", { name: "収入を編集" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "収入（分配）" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  expect(screen.getByLabelText("名目")).toBeInTheDocument();
+});
+
+test("編集中に支出⇄収入を切り替えると見出しが追従し、更新時の kind に反映される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemGetMock.mockResolvedValue({ ok: true, json: async () => item });
+  membersGetMock.mockResolvedValue({ ok: true, json: async () => members });
+  putMock.mockResolvedValue({ ok: true, json: async () => ({ id: "i1" }) });
+
+  renderWithClient(<EditItemPage />);
+
+  await screen.findByDisplayValue("ランチ");
+  expect(screen.getByRole("heading", { name: "購入品を編集" })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "収入（分配）" }));
+  expect(screen.getByRole("heading", { name: "収入を編集" })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "更新" }));
+
+  await waitFor(() => {
+    expect(putMock).toHaveBeenCalledWith({
+      param: { groupId: "g1", itemId: "i1" },
+      json: {
+        name: "ランチ",
+        purchasedOn: "2026-06-01",
+        memo: "駅前",
+        kind: "income",
+        payments: [{ userId: "owner", amount: 1000 }],
+        shares: [
+          { userId: "owner", amount: 500 },
+          { userId: "friend", amount: 500 },
+        ],
+      },
+    });
+  });
 });
 
 test("編集時は等分が OFF で、手動調整済みの割勘金額が等分で上書きされない", async () => {
@@ -146,6 +199,7 @@ test("更新すると PUT が呼ばれ、一覧へ遷移する", async () => {
         name: "ランチ",
         purchasedOn: "2026-06-01",
         memo: "駅前",
+        kind: "expense",
         payments: [{ userId: "owner", amount: 1000 }],
         shares: [
           { userId: "owner", amount: 500 },

@@ -61,11 +61,12 @@ export async function validateItemInput(
 
 type ItemRow = Pick<
   InferSelectModel<typeof item>,
-  "id" | "name" | "purchasedOn" | "memo" | "status"
+  "id" | "name" | "purchasedOn" | "memo" | "status" | "kind"
 >;
 
 // item 行 + payments/shares から API レスポンス用の item オブジェクトを組み立てる
 //（GET 一覧・GET 単一で共通）。purchasedOn は null 変換、total は支払額合計（Issue #19）。
+// income では total は受取額合計（payments 合計、符号は付けない。表示側で +/− を付ける）。
 export function toItemResponse(row: ItemRow, payments: AmountEntry[], shares: AmountEntry[]) {
   return {
     id: row.id,
@@ -73,6 +74,7 @@ export function toItemResponse(row: ItemRow, payments: AmountEntry[], shares: Am
     purchasedOn: row.purchasedOn ? row.purchasedOn.toISOString() : null,
     memo: row.memo,
     status: row.status,
+    kind: row.kind,
     total: sumAmount(payments),
     payments,
     shares,

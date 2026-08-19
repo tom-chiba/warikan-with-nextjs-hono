@@ -8,6 +8,8 @@ export {
   type AmountEntry,
   computeBalances,
   computeSettlements,
+  ITEM_KINDS,
+  type ItemKind,
   minimizeTransfers,
   type SettlementItem,
   type Transfer,

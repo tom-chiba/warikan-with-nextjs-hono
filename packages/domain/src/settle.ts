@@ -7,7 +7,16 @@
 
 export type AmountEntry = { userId: string; amount: number };
 
+// 収入モード（Issue: 収入分配機能）。expense は支出（割り勘）、income は収入（分配）。
+// income では payments=受取額、shares=分担額（取り分）として役割が反転するため、
+// 収支集計（computeBalances）では符号を反転して合算する。
+// DB スキーマ（enum 定義）・API のバリデーション（zod）から共通で参照し、
+// 取りうる値の集合を単一の場所に保つ。
+export const ITEM_KINDS = ["expense", "income"] as const;
+export type ItemKind = (typeof ITEM_KINDS)[number];
+
 export type SettlementItem = {
+  kind: ItemKind;
   payments: AmountEntry[];
   shares: AmountEntry[];
 };
@@ -17,17 +26,20 @@ export type Transfer = { from: string; to: string; amount: number };
 
 // 選択アイテム群からメンバーごとの収支を集計する。
 // 正 = 払いすぎ（受け取る側）、負 = 払い足りない（払う側）、0 はちょうど。
+// expense は payments=+、shares=−。income は受け取った人が分担額を配る側になるため符号が逆
+// （payments=−、shares=+）。
 export function computeBalances(items: SettlementItem[]): Record<string, number> {
   const balances: Record<string, number> = {};
   const add = (userId: string, delta: number) => {
     balances[userId] = (balances[userId] ?? 0) + delta;
   };
-  for (const { payments, shares } of items) {
+  for (const { kind, payments, shares } of items) {
+    const sign = kind === "income" ? -1 : 1;
     for (const p of payments) {
-      add(p.userId, p.amount);
+      add(p.userId, sign * p.amount);
     }
     for (const s of shares) {
-      add(s.userId, -s.amount);
+      add(s.userId, -sign * s.amount);
     }
   }
   return balances;

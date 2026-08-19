@@ -181,6 +181,7 @@ test("保存すると 0 円行を除いて POST し、成功後にフォーム�
         name: "ランチ",
         purchasedOn: todayLocal(),
         memo: null,
+        kind: "expense",
         payments: [{ userId: "u1", amount: 1000 }],
         shares: [
           { userId: "u1", amount: 500 },
@@ -228,6 +229,58 @@ test("保存時に 401 が返るとセッション切れメッセージを表示
   expect(
     await screen.findByText("セッションが切れました。再度サインインしてください。"),
   ).toBeInTheDocument();
+});
+
+test("収入（分配）に切り替えると見出し・ラベルが収入向けに変わる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  renderWithClient(<NewItemPage />);
+
+  await screen.findByLabelText("購入品名");
+  expect(screen.getByRole("heading", { name: "購入品を入力" })).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: "収入（分配）" }));
+
+  expect(screen.getByRole("heading", { name: "収入を入力" })).toBeInTheDocument();
+  expect(screen.getByLabelText("名目")).toBeInTheDocument();
+  expect(screen.getByText("受取額")).toBeInTheDocument();
+  expect(screen.getByText("分担額")).toBeInTheDocument();
+  expect(
+    screen.getByText("等分（受取額合計を人数で等分し、端数は自動で振り分け）"),
+  ).toBeInTheDocument();
+});
+
+test("収入（分配）で保存すると kind: income で POST される", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  setTwoMembers();
+  itemsPostMock.mockResolvedValue({ ok: true, json: async () => ({ id: "item1" }) });
+  renderWithClient(<NewItemPage />);
+
+  await userEvent.click(await screen.findByRole("button", { name: "収入（分配）" }));
+  await userEvent.type(screen.getByLabelText("名目"), "臨時給付金");
+  await userEvent.type(screen.getByLabelText("わたし の受取額"), "1000"); // 等分（デフォルト ON）→ 500/500
+
+  await userEvent.click(screen.getByRole("button", { name: "保存" }));
+
+  await waitFor(() => {
+    expect(itemsPostMock).toHaveBeenCalledWith({
+      param: { groupId: "g1" },
+      json: {
+        name: "臨時給付金",
+        purchasedOn: todayLocal(),
+        memo: null,
+        kind: "income",
+        payments: [{ userId: "u1", amount: 1000 }],
+        shares: [
+          { userId: "u1", amount: 500 },
+          { userId: "u2", amount: 500 },
+        ],
+      },
+    });
+  });
+
+  // 保存後もモードは残る（デザイン方針: 連続入力向き）。
+  expect(screen.getByRole("heading", { name: "収入を入力" })).toBeInTheDocument();
 });
 
 test("合計が一致しないと保存ボタンは無効", async () => {

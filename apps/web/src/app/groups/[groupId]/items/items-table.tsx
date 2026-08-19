@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import type { ItemKind } from "@warikan/domain";
 import { formatAmount } from "@/lib/format";
 import { IndeterminateCheckbox } from "./indeterminate-checkbox";
 
@@ -10,6 +11,7 @@ export type ItemRowData = {
   name: string;
   purchasedOn: string | null;
   total: number;
+  kind: ItemKind;
 };
 
 // 選択列（チェックボックス）。未精算ビューのみ使用（送金計算・精算の対象選択）。
@@ -77,7 +79,12 @@ export function ItemsTable({ items, selectable, renderActions }: Props) {
             <td className="whitespace-nowrap py-2.5 pr-4 tabular-nums text-muted">
               {item.purchasedOn ? item.purchasedOn.slice(0, 10) : "—"}
             </td>
-            <td className="whitespace-nowrap py-2.5 pr-4 text-right font-bold tabular-nums">
+            <td
+              className={`whitespace-nowrap py-2.5 pr-4 text-right font-bold tabular-nums ${
+                item.kind === "income" ? "text-ok" : ""
+              }`}
+            >
+              {item.kind === "income" ? "+" : "−"}
               {formatAmount(item.total)} 円
             </td>
             <td className="py-2.5 text-right">

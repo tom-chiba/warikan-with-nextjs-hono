@@ -64,6 +64,13 @@
       "when": 1781343508833,
       "tag": "0008_add_passkey",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1787147182362,
+      "tag": "0009_sweet_mockingbird",
+      "breakpoints": true
     }
   ]
 }
