@@ -23,12 +23,13 @@ const amountEntry = z.object({
 
 // 購入品の保存・更新の入力。purchasedOn は input type="date" の値（"YYYY-MM-DD"）。
 // 購入日・メモは任意（未入力なら null 相当）。新規(POST)・更新(PUT)で共通。
-// kind: 支出（割り勘）/ 収入（分配）。未指定は expense（既存クライアント互換）。
+// kind（支出/収入）は payments/shares の意味づけを左右し精算計算の符号を決めるため、
+// name 等と同じく省略不可（PUT で誤って省略すると既存の kind が意図せず変わってしまうことを防ぐ）。
 const itemSchema = z.object({
   name: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   purchasedOn: z.iso.date().nullish(),
   memo: z.string().max(MEMO_MAX_LENGTH).nullish(),
-  kind: z.enum(ITEM_KINDS).default("expense"),
+  kind: z.enum(ITEM_KINDS),
   payments: z.array(amountEntry),
   shares: z.array(amountEntry),
 });

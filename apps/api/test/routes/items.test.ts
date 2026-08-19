@@ -14,11 +14,14 @@ type CreateItemBody = {
   shares: { userId: string; amount: number }[];
 };
 
+// kind は API 側で必須（PUT で省略すると既存の kind が意図せず変わりうるため）だが、
+// このヘルパーでは kind を省略したテストが引き続き動くよう既定で expense を補う。
+// 「kind を省略すると 400」自体を検証するテストは、このヘルパーを経由せず直接 fetch する。
 function postItem(cookie: string, groupId: string, body: CreateItemBody) {
   return SELF.fetch(`${BASE}/groups/${groupId}/items`, {
     method: "POST",
     headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ kind: "expense", ...body }),
   });
 }
 
@@ -89,22 +92,23 @@ describe("POST /groups/:groupId/items（購入品の保存）", () => {
     expect(item?.purchased_on).toBeNull();
   });
 
-  it("kind を省略すると expense として保存される", async () => {
-    const cookie = await signUpAndGetCookie("item-kind-default@example.com");
-    const userId = await getUserId(env.DB, "item-kind-default@example.com");
+  it("kind を省略すると 400（PUT での意図しない上書きを防ぐため必須）", async () => {
+    const cookie = await signUpAndGetCookie("item-kind-required@example.com");
+    const userId = await getUserId(env.DB, "item-kind-required@example.com");
     const groupId = await createGroup(cookie);
 
-    const res = await postItem(cookie, groupId, {
-      name: "コーヒー",
-      payments: [{ userId, amount: 300 }],
-      shares: [{ userId, amount: 300 }],
+    // postItem ヘルパーを介さず直接 fetch し、kind を本当に省略する。
+    const res = await SELF.fetch(`${BASE}/groups/${groupId}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "コーヒー",
+        payments: [{ userId, amount: 300 }],
+        shares: [{ userId, amount: 300 }],
+      }),
     });
 
-    const { id } = (await res.json()) as { id: string };
-    const item = await env.DB.prepare("SELECT kind FROM item WHERE id = ?")
-      .bind(id)
-      .first<{ kind: string }>();
-    expect(item?.kind).toBe("expense");
+    expect(res.status).toBe(400);
   });
 
   it("kind: income で保存でき、そのまま返る（収入分配機能）", async () => {
@@ -260,11 +264,12 @@ function getItem(cookie: string, groupId: string, itemId: string) {
   return SELF.fetch(`${BASE}/groups/${groupId}/items/${itemId}`, { headers: { cookie } });
 }
 
+// postItem 同様、kind 省略時は expense を補う（省略時 400 の検証は直接 fetch する）。
 function putItem(cookie: string, groupId: string, itemId: string, body: CreateItemBody) {
   return SELF.fetch(`${BASE}/groups/${groupId}/items/${itemId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", cookie },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ kind: "expense", ...body }),
   });
 }
 
@@ -448,6 +453,36 @@ describe("PUT /groups/:groupId/items/:itemId（更新）", () => {
     // payments は friend 1 行に差し替わり、shares は 2 行になる。
     expect(await countRows("item_payment", itemId)).toBe(1);
     expect(await countRows("item_share", itemId)).toBe(2);
+  });
+
+  it("kind を省略した PUT は 400 になり、既存の kind は変わらない（収入分配機能）", async () => {
+    const cookie = await signUpAndGetCookie("put-kind-required@example.com");
+    const userId = await getUserId(env.DB, "put-kind-required@example.com");
+    const groupId = await createGroup(cookie);
+    const created = await postItem(cookie, groupId, {
+      name: "臨時給付金",
+      kind: "income",
+      payments: [{ userId, amount: 1000 }],
+      shares: [{ userId, amount: 1000 }],
+    });
+    const itemId = ((await created.json()) as { id: string }).id;
+
+    // putItem ヘルパーを介さず直接 fetch し、kind を本当に省略する。
+    const res = await SELF.fetch(`${BASE}/groups/${groupId}/items/${itemId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", cookie },
+      body: JSON.stringify({
+        name: "臨時給付金",
+        payments: [{ userId, amount: 1000 }],
+        shares: [{ userId, amount: 1000 }],
+      }),
+    });
+    expect(res.status).toBe(400);
+
+    const item = await env.DB.prepare("SELECT kind FROM item WHERE id = ?")
+      .bind(itemId)
+      .first<{ kind: string }>();
+    expect(item?.kind).toBe("income");
   });
 
   it("支払額合計 ≠ 割勘金額合計 なら 400", async () => {
@@ -650,14 +685,14 @@ describe("POST /groups/:groupId/settlements（精算実行）", () => {
   });
 
   it("income と expense が混在しても正しい送金リストで精算できる（収入分配機能）", async () => {
-    const ownerCookie = await signUpAndGetCookie("settle-income-owner@example.com");
-    const ownerId = await getUserId(env.DB, "settle-income-owner@example.com");
-    await signUpAndGetCookie("settle-income-friend@example.com");
-    const friendId = await getUserId(env.DB, "settle-income-friend@example.com");
+    const ownerCookie = await signUpAndGetCookie("settle-mixed-owner@example.com");
+    const ownerId = await getUserId(env.DB, "settle-mixed-owner@example.com");
+    await signUpAndGetCookie("settle-mixed-friend@example.com");
+    const friendId = await getUserId(env.DB, "settle-mixed-friend@example.com");
     const groupId = await createGroup(ownerCookie);
     await addMember(groupId, friendId);
 
-    // 収入 900 を owner が受け取り、2 人で 450 ずつ分担 → owner が friend に 450 円払う側になる。
+    // 収入 900 を owner が受け取り、2 人で 450 ずつ分担 → この 1 件だけなら owner:-450, friend:+450。
     const income = await postItem(ownerCookie, groupId, {
       name: "臨時給付金",
       kind: "income",
@@ -669,15 +704,28 @@ describe("POST /groups/:groupId/settlements（精算実行）", () => {
     });
     const incomeId = ((await income.json()) as { id: string }).id;
 
+    // 支出 300 を friend が立替え、2 人で 150 ずつ分担 → この 1 件だけなら friend:+150, owner:-150。
+    const expense = await postItem(ownerCookie, groupId, {
+      name: "ランチ",
+      kind: "expense",
+      payments: [{ userId: friendId, amount: 300 }],
+      shares: [
+        { userId: ownerId, amount: 150 },
+        { userId: friendId, amount: 150 },
+      ],
+    });
+    const expenseId = ((await expense.json()) as { id: string }).id;
+
+    // 混在させると owner:-600, friend:+600 に合算され、送金は owner → friend 600 円の 1 件になる。
     const res = await settle(
       ownerCookie,
       groupId,
-      [incomeId],
-      [{ from: ownerId, to: friendId, amount: 450 }],
+      [incomeId, expenseId],
+      [{ from: ownerId, to: friendId, amount: 600 }],
     );
     expect(res.status).toBe(200);
     const { settled } = (await res.json()) as { settled: string[] };
-    expect(settled).toEqual([incomeId]);
+    expect(settled.sort()).toEqual([incomeId, expenseId].sort());
   });
 
   it("存在しない・他グループ・精算済みの id が混じっていたら 409 で拒否され、何も更新されない", async () => {
