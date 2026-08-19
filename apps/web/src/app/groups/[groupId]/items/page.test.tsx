@@ -208,6 +208,39 @@ test("精算するとボタンで選択 id と確認済み送金リストが set
   });
 });
 
+test("収入アイテムを選択すると、受取人が支払う側に反転した送金リストが表示・送信される（収入分配機能）", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // owner が 900 受け取り、owner/friend で 450 ずつ分担 → owner が friend に 450 円払う側になる。
+  const incomeItem = {
+    ...lunchItem,
+    kind: "income",
+    total: 900,
+    payments: [{ userId: "owner", amount: 900 }],
+    shares: [
+      { userId: "owner", amount: 450 },
+      { userId: "friend", amount: 450 },
+    ],
+  };
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [incomeItem] }) });
+  settleMock.mockResolvedValue({ ok: true, json: async () => ({ settled: ["i1"] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const list = await screen.findByText("オーナー → フレンド");
+  expect(within(list.closest("li") as HTMLElement).getByText("450 円")).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
+
+  await waitFor(() => {
+    expect(settleMock).toHaveBeenCalledWith({
+      param: { groupId: "g1" },
+      json: { itemIds: ["i1"], transfers: [{ from: "owner", to: "friend", amount: 450 }] },
+    });
+  });
+});
+
 test("精算が 409（一覧が古い・送金リスト不一致）ならサーバーの理由を表示する", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
