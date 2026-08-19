@@ -8,6 +8,7 @@ import type { ItemKind } from "@warikan/domain";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
 import { apiClient } from "@/lib/api-client";
 import { SESSION_EXPIRED_MESSAGE } from "@/lib/auth-error";
+import { itemKindNoun } from "@/lib/item-kind";
 import { itemKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
@@ -98,7 +99,7 @@ export function EditItemInner() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-6">
       <div className="flex flex-col gap-1">
         <span className="kicker">Edit Item</span>
-        <h1 className="headline">{kind === "income" ? "収入" : "購入品"}を編集</h1>
+        <h1 className="headline">{itemKindNoun(kind)}を編集</h1>
       </div>
 
       {fetchError && (

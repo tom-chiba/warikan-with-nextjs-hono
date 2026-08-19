@@ -370,6 +370,24 @@ test("精算済ビューではアイテムが表示され、選択チェック�
   );
 });
 
+test("精算済ビューでも収入アイテムは + 付き・緑色で表示される（収入分配機能）", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  const settledIncomeItem = {
+    ...settledItem,
+    id: "i2",
+    name: "臨時給付金",
+    kind: "income",
+    total: 120000,
+  };
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [settledIncomeItem] }) });
+
+  renderSettledView();
+
+  const amount = await screen.findByText("+120,000 円");
+  expect(amount).toBeInTheDocument();
+  expect(amount).toHaveClass("text-ok");
+});
+
 test("精算済が 0 件のときは空表示になる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });

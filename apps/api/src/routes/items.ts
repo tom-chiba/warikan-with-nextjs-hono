@@ -1,6 +1,7 @@
 import { zValidator } from "@hono/zod-validator";
 import {
   computeSettlements,
+  ITEM_KINDS,
   MEMO_MAX_LENGTH,
   NAME_MAX_LENGTH,
   transfersEqual,
@@ -27,7 +28,7 @@ const itemSchema = z.object({
   name: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   purchasedOn: z.iso.date().nullish(),
   memo: z.string().max(MEMO_MAX_LENGTH).nullish(),
-  kind: z.enum(["expense", "income"]).default("expense"),
+  kind: z.enum(ITEM_KINDS).default("expense"),
   payments: z.array(amountEntry),
   shares: z.array(amountEntry),
 });

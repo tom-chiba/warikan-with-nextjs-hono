@@ -103,6 +103,16 @@ test("保存すると指定グループへ POST し、成功メッセージを�
   expect(await screen.findByText("保存しました")).toBeInTheDocument();
 });
 
+test("収入（分配）に切り替えると見出しが追従する", async () => {
+  setTwoMembers();
+  renderWithClient(<QuickItemEntry groupId="g1" groupName="旅行" />);
+
+  await screen.findByLabelText("購入品名");
+  await userEvent.click(screen.getByRole("button", { name: "収入（分配）" }));
+
+  expect(screen.getByRole("heading", { name: "旅行 に収入を入力" })).toBeInTheDocument();
+});
+
 test("同じ購入日（今日）で連続保存すると、重複ヒントが保存後に再取得される", async () => {
   // 購入日のデフォルトは今日なので PurchasedOnDuplicates は初期表示から今日分を取得する。
   // 保存後も購入日が今日のまま維持されるため、再取得しないと今入れたアイテムがヒントから漏れる。

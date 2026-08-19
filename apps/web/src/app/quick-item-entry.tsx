@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ItemKind } from "@warikan/domain";
+import { itemKindNoun } from "@/lib/item-kind";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemForm } from "./groups/[groupId]/items/item-form";
 import { PurchasedOnDuplicates } from "./groups/[groupId]/items/purchased-on-duplicates";
@@ -24,7 +25,7 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
       <div className="flex flex-col gap-1">
         <span className="kicker">Quick Entry</span>
         <h2 className="headline">
-          {groupName} に{kind === "income" ? "収入" : "購入品"}を入力
+          {groupName} に{itemKindNoun(kind)}を入力
         </h2>
       </div>
       {membersError ? (

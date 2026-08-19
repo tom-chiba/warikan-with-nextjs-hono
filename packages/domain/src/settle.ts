@@ -10,7 +10,10 @@ export type AmountEntry = { userId: string; amount: number };
 // 収入モード（Issue: 収入分配機能）。expense は支出（割り勘）、income は収入（分配）。
 // income では payments=受取額、shares=分担額（取り分）として役割が反転するため、
 // 収支集計（computeBalances）では符号を反転して合算する。
-export type ItemKind = "expense" | "income";
+// DB スキーマ（enum 定義）・API のバリデーション（zod）から共通で参照し、
+// 取りうる値の集合を単一の場所に保つ。
+export const ITEM_KINDS = ["expense", "income"] as const;
+export type ItemKind = (typeof ITEM_KINDS)[number];
 
 export type SettlementItem = {
   kind: ItemKind;

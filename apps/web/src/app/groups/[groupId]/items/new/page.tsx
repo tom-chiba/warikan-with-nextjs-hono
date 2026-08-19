@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import type { ItemKind } from "@warikan/domain";
 import { SessionPending, SignInPrompt } from "@/components/session-states";
+import { itemKindNoun } from "@/lib/item-kind";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { useResolvedSession } from "@/lib/use-resolved-session";
 import { ItemForm } from "../item-form";
@@ -36,7 +37,7 @@ export default function NewItemPage() {
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-5 py-6">
       <div className="flex flex-col gap-1">
         <span className="kicker">New Item</span>
-        <h1 className="headline">{kind === "income" ? "収入" : "購入品"}を入力</h1>
+        <h1 className="headline">{itemKindNoun(kind)}を入力</h1>
       </div>
 
       <ItemForm

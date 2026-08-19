@@ -69,6 +69,46 @@ function totalOf(amounts: Record<string, string>, userIds: string[]): number {
   return userIds.reduce((sum, userId) => sum + parseAmount(amounts[userId]), 0);
 }
 
+type ItemFormLabels = {
+  nameLabel: string;
+  namePlaceholder: string;
+  dateLabel: string;
+  payTitle: string;
+  shareTitle: string;
+  paySuffix: string;
+  shareSuffix: string;
+  equalLabel: string;
+  diffPrefix: string;
+};
+
+// kind に応じた文言（デザイン: Income Split Mode 1A）。金額の入力・検証ロジックは
+// 支出・収入で変わらず、ラベルの出し分けだけで役割反転を表現する。
+// Record<ItemKind, ...> にすることで、kind が増えたときのキー漏れをコンパイル時に検出できる。
+const ITEM_FORM_LABELS: Record<ItemKind, ItemFormLabels> = {
+  expense: {
+    nameLabel: "購入品名",
+    namePlaceholder: "例: ランチ",
+    dateLabel: "購入日（任意）",
+    payTitle: "支払額",
+    shareTitle: "割勘金額",
+    paySuffix: "の支払額",
+    shareSuffix: "の割勘金額",
+    equalLabel: "等分（支払額合計を人数で等分し、端数は自動で振り分け）",
+    diffPrefix: "支払額合計との差: ",
+  },
+  income: {
+    nameLabel: "名目",
+    namePlaceholder: "例: 臨時給付金",
+    dateLabel: "入金日（任意）",
+    payTitle: "受取額",
+    shareTitle: "分担額",
+    paySuffix: "の受取額",
+    shareSuffix: "の分担額",
+    equalLabel: "等分（受取額合計を人数で等分し、端数は自動で振り分け）",
+    diffPrefix: "受取額合計との差: ",
+  },
+};
+
 const EMPTY: Record<string, string> = {};
 
 export function ItemForm({
@@ -106,32 +146,7 @@ export function ItemForm({
   const shareTotal = totalOf(shares, memberIds);
   const deficit = paymentTotal - shareTotal;
   const isIncome = kind === "income";
-
-  // kind に応じた文言（デザイン: Income Split Mode 1A）。金額の入力・検証ロジックは
-  // 支出・収入で変わらず、ラベルの出し分けだけで役割反転を表現する。
-  const labels = isIncome
-    ? {
-        nameLabel: "名目",
-        namePlaceholder: "例: 臨時給付金",
-        dateLabel: "入金日（任意）",
-        payTitle: "受取額",
-        shareTitle: "分担額",
-        paySuffix: "の受取額",
-        shareSuffix: "の分担額",
-        equalLabel: "等分（受取額合計を人数で等分し、端数は自動で振り分け）",
-        diffPrefix: "受取額合計との差: ",
-      }
-    : {
-        nameLabel: "購入品名",
-        namePlaceholder: "例: ランチ",
-        dateLabel: "購入日（任意）",
-        payTitle: "支払額",
-        shareTitle: "割勘金額",
-        paySuffix: "の支払額",
-        shareSuffix: "の割勘金額",
-        equalLabel: "等分（支払額合計を人数で等分し、端数は自動で振り分け）",
-        diffPrefix: "支払額合計との差: ",
-      };
+  const labels = ITEM_FORM_LABELS[kind];
 
   function handleKindChange(next: ItemKind) {
     setKind(next);

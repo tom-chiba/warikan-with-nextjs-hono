@@ -1,3 +1,4 @@
+import { ITEM_KINDS } from "@warikan/domain";
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Better Auth のコアスキーマ（メール + パスワード）を Drizzle(SQLite/D1) で定義する。
@@ -189,9 +190,7 @@ export const item = sqliteTable(
     status: text("status", { enum: ["unsettled", "settled"] })
       .notNull()
       .default("unsettled"),
-    kind: text("kind", { enum: ["expense", "income"] })
-      .notNull()
-      .default("expense"),
+    kind: text("kind", { enum: ITEM_KINDS }).notNull().default("expense"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .$defaultFn(() => new Date())
       .notNull(),
