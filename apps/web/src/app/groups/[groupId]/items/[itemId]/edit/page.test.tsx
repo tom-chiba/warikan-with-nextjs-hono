@@ -71,6 +71,7 @@ const item = {
     purchasedOn: "2026-06-01T00:00:00.000Z",
     memo: "駅前",
     status: "unsettled",
+    kind: "expense",
     total: 1000,
     payments: [{ userId: "owner", amount: 1000 }],
     shares: [
@@ -146,6 +147,7 @@ test("更新すると PUT が呼ばれ、一覧へ遷移する", async () => {
         name: "ランチ",
         purchasedOn: "2026-06-01",
         memo: "駅前",
+        kind: "expense",
         payments: [{ userId: "owner", amount: 1000 }],
         shares: [
           { userId: "owner", amount: 500 },

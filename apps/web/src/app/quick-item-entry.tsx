@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import type { ItemKind } from "@warikan/domain";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemForm } from "./groups/[groupId]/items/item-form";
 import { PurchasedOnDuplicates } from "./groups/[groupId]/items/purchased-on-duplicates";
@@ -13,13 +15,17 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
   const { data: membersData, isError: membersError } = useGroupMembers(groupId, true);
   const members = membersData?.members ?? [];
   const handleSubmit = useCreateItem(groupId);
+  // ItemForm 内部の切替（支出/収入）に見出し文言を追従させる（収入分配機能）。
+  const [kind, setKind] = useState<ItemKind>("expense");
 
   return (
     <section className="flex w-full max-w-md flex-col gap-4">
       {/* 一覧への導線は MainNav の「未精算 / 精算済」タブが担うため、ここには置かない（#51）。 */}
       <div className="flex flex-col gap-1">
         <span className="kicker">Quick Entry</span>
-        <h2 className="headline">{groupName} に購入品を入力</h2>
+        <h2 className="headline">
+          {groupName} に{kind === "income" ? "収入" : "購入品"}を入力
+        </h2>
       </div>
       {membersError ? (
         // members が空のままだと ItemForm が「読み込み中」を出し続けるため、失敗は明示する。
@@ -33,6 +39,7 @@ export function QuickItemEntry({ groupId, groupName }: { groupId: string; groupN
           renderPurchasedOnNote={(purchasedOn) => (
             <PurchasedOnDuplicates groupId={groupId} purchasedOn={purchasedOn} />
           )}
+          onKindChange={setKind}
           onSubmit={handleSubmit}
         />
       )}

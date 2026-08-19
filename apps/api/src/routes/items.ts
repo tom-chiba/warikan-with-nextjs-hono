@@ -22,10 +22,12 @@ const amountEntry = z.object({
 
 // 購入品の保存・更新の入力。purchasedOn は input type="date" の値（"YYYY-MM-DD"）。
 // 購入日・メモは任意（未入力なら null 相当）。新規(POST)・更新(PUT)で共通。
+// kind: 支出（割り勘）/ 収入（分配）。未指定は expense（既存クライアント互換）。
 const itemSchema = z.object({
   name: z.string().trim().min(1).max(NAME_MAX_LENGTH),
   purchasedOn: z.iso.date().nullish(),
   memo: z.string().max(MEMO_MAX_LENGTH).nullish(),
+  kind: z.enum(["expense", "income"]).default("expense"),
   payments: z.array(amountEntry),
   shares: z.array(amountEntry),
 });
@@ -49,7 +51,7 @@ export const items = new Hono<{
   .post("/:groupId/items", zValidator("json", itemSchema), async (c) => {
     const member = c.get("groupMember");
     const db = c.get("db");
-    const { name, purchasedOn, memo, payments, shares } = c.req.valid("json");
+    const { name, purchasedOn, memo, kind, payments, shares } = c.req.valid("json");
 
     const validationError = await validateItemInput(db, member.groupId, { payments, shares });
     if (validationError) {
@@ -70,6 +72,7 @@ export const items = new Hono<{
         // 表示時は UTC で日付部分を取り出すこと（ローカルTZ で解釈すると前日に見える端末が出る）。
         purchasedOn: purchasedOn ? new Date(purchasedOn) : null,
         memo: memo ?? null,
+        kind,
       }),
       db.insert(itemPayment).values(makeRows(id, payments)),
       db.insert(itemShare).values(makeRows(id, shares)),
@@ -157,7 +160,7 @@ export const items = new Hono<{
     const member = c.get("groupMember");
     const db = c.get("db");
     const itemId = c.req.param("itemId");
-    const { name, purchasedOn, memo, payments, shares } = c.req.valid("json");
+    const { name, purchasedOn, memo, kind, payments, shares } = c.req.valid("json");
 
     const validationError = await validateItemInput(db, member.groupId, { payments, shares });
     if (validationError) {
@@ -184,6 +187,7 @@ export const items = new Hono<{
           name,
           purchasedOn: purchasedOn ? new Date(purchasedOn) : null,
           memo: memo ?? null,
+          kind,
           updatedAt: new Date(),
         })
         // status は問わないが、groupId の一致は WHERE でも保証する（存在確認との二重防御）。
@@ -238,8 +242,9 @@ export const items = new Hono<{
 
       // 対象アイテムを取得する（groupId 一致・未精算のみ）。選択された id と一致しなければ
       // クライアントの一覧が古い（削除・精算済み・他グループ混入）ので拒否する。
+      // kind も取得し、収支再計算（computeSettlements）の符号反転に使う。
       const rows = await db
-        .select({ id: item.id })
+        .select({ id: item.id, kind: item.kind })
         .from(item)
         .where(
           and(
@@ -263,9 +268,10 @@ export const items = new Hono<{
       // 読み込みは GET /items と同じ loadItemAmounts に揃える（一覧表示と検証の入力を一致させる）。
       const { paymentsByItem, sharesByItem } = await loadItemAmounts(db, foundIds);
       const expected = computeSettlements(
-        foundIds.map((id) => ({
-          payments: paymentsByItem.get(id) ?? [],
-          shares: sharesByItem.get(id) ?? [],
+        rows.map((r) => ({
+          kind: r.kind,
+          payments: paymentsByItem.get(r.id) ?? [],
+          shares: sharesByItem.get(r.id) ?? [],
         })),
       );
       if (!transfersEqual(expected, transfers)) {

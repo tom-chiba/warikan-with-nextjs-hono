@@ -80,6 +80,7 @@ const lunchItem = {
   purchasedOn: "2026-06-01T00:00:00.000Z",
   memo: null,
   status: "unsettled",
+  kind: "expense",
   total: 1000,
   payments: [{ userId: "owner", amount: 1000 }],
   shares: [
@@ -144,7 +145,25 @@ test("未精算アイテムが品名・購入日・合計金額付きで一覧�
 
   expect(await screen.findByText("ランチ")).toBeInTheDocument();
   expect(screen.getByText("2026-06-01")).toBeInTheDocument();
-  expect(screen.getByText("1,000 円")).toBeInTheDocument();
+  expect(screen.getByText("−1,000 円")).toBeInTheDocument();
+});
+
+test("収入アイテムは合計金額が + 付き・緑色で表示される（収入分配機能）", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  const incomeItem = {
+    ...lunchItem,
+    id: "i2",
+    name: "臨時給付金",
+    kind: "income",
+    total: 120000,
+  };
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [incomeItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  const amount = await screen.findByText("+120,000 円");
+  expect(amount).toBeInTheDocument();
+  expect(amount).toHaveClass("text-ok");
 });
 
 test("0 件のときは空表示になる", async () => {
@@ -335,7 +354,7 @@ test("精算済ビューではアイテムが表示され、選択チェック�
   renderSettledView();
 
   expect(await screen.findByText("ランチ")).toBeInTheDocument();
-  expect(screen.getByText("1,000 円")).toBeInTheDocument();
+  expect(screen.getByText("−1,000 円")).toBeInTheDocument();
   // 精算対象の選択は未精算ビュー専用（全選択ヘッダー含む）。
   expect(screen.queryByLabelText("ランチ を選択")).not.toBeInTheDocument();
   expect(screen.queryByLabelText("全て選択")).not.toBeInTheDocument();

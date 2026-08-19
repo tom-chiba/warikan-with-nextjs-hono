@@ -15,6 +15,7 @@ describe("computeBalances", () => {
     // a が 1000 立替、a/b で 500 ずつ負担 → a:+500, b:-500。
     const items: SettlementItem[] = [
       {
+        kind: "expense",
         payments: [{ userId: "a", amount: 1000 }],
         shares: [
           { userId: "a", amount: 500 },
@@ -28,6 +29,7 @@ describe("computeBalances", () => {
   it("複数アイテムをまたいで合算する", () => {
     const items: SettlementItem[] = [
       {
+        kind: "expense",
         payments: [{ userId: "a", amount: 1000 }],
         shares: [
           { userId: "a", amount: 500 },
@@ -36,6 +38,7 @@ describe("computeBalances", () => {
       },
       {
         // b が 600 立替、a/b で 300 ずつ → b:+300, a:-300。
+        kind: "expense",
         payments: [{ userId: "b", amount: 600 }],
         shares: [
           { userId: "a", amount: 300 },
@@ -50,6 +53,7 @@ describe("computeBalances", () => {
   it("収支の総和は常に 0", () => {
     const items: SettlementItem[] = [
       {
+        kind: "expense",
         payments: [
           { userId: "a", amount: 700 },
           { userId: "b", amount: 300 },
@@ -64,6 +68,55 @@ describe("computeBalances", () => {
     ];
     const balances = computeBalances(items);
     expect(Object.values(balances).reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it("income は payments/shares の符号が反転する（受取額を配る側になる）", () => {
+    // u1 が 900 受け取り、3 人で 300 ずつ分担 → 受取人 u1 が他の 2 人へ 300 ずつ払う側になる。
+    const items: SettlementItem[] = [
+      {
+        kind: "income",
+        payments: [{ userId: "u1", amount: 900 }],
+        shares: [
+          { userId: "u1", amount: 300 },
+          { userId: "u2", amount: 300 },
+          { userId: "u3", amount: 300 },
+        ],
+      },
+    ];
+    expect(computeBalances(items)).toEqual({ u1: -600, u2: 300, u3: 300 });
+  });
+
+  it("income と expense が混在しても正しく合算される（デザインの実データで検証）", () => {
+    // Income Split Mode デザイン（DesignSync）のスクリプト状態そのまま:
+    // 収入 120,000 を u1 が受け取り 3 人で 40,000 ずつ分担、支出 6,400 を u1 が立替え
+    // 2,134/2,133/2,133 で分担。
+    const items: SettlementItem[] = [
+      {
+        kind: "income",
+        payments: [{ userId: "u1", amount: 120000 }],
+        shares: [
+          { userId: "u1", amount: 40000 },
+          { userId: "u2", amount: 40000 },
+          { userId: "u3", amount: 40000 },
+        ],
+      },
+      {
+        kind: "expense",
+        payments: [{ userId: "u1", amount: 6400 }],
+        shares: [
+          { userId: "u1", amount: 2134 },
+          { userId: "u2", amount: 2133 },
+          { userId: "u3", amount: 2133 },
+        ],
+      },
+    ];
+    // u1: 収入で -120000+40000=-80000、支出で +6400-2134=+4266 → -75734。
+    // u2/u3: 収入で +40000、支出で -2133 → +37867。
+    expect(computeBalances(items)).toEqual({ u1: -75734, u2: 37867, u3: 37867 });
+    expect(computeSettlements(items)).toEqual([
+      { from: "u1", to: "u2", amount: 37867 },
+      { from: "u1", to: "u3", amount: 37867 },
+    ]);
   });
 });
 
@@ -110,6 +163,7 @@ describe("computeSettlements", () => {
   it("選択アイテムから送金リストを算出し、送金合計が収支と整合する", () => {
     const items: SettlementItem[] = [
       {
+        kind: "expense",
         payments: [{ userId: "a", amount: 1200 }],
         shares: [
           { userId: "a", amount: 400 },
@@ -149,6 +203,7 @@ describe("transfersEqual", () => {
 
   it("computeSettlements の出力同士は入力アイテム順が違っても一致する（順序保証への依存を固定）", () => {
     const lunch: SettlementItem = {
+      kind: "expense",
       payments: [{ userId: "a", amount: 1000 }],
       shares: [
         { userId: "a", amount: 500 },
@@ -156,6 +211,7 @@ describe("transfersEqual", () => {
       ],
     };
     const dinner: SettlementItem = {
+      kind: "expense",
       payments: [{ userId: "b", amount: 600 }],
       shares: [
         { userId: "a", amount: 300 },

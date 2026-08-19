@@ -4,6 +4,7 @@ import { type FormEvent, type ReactNode, useState } from "react";
 import {
   amountsBalanced,
   distributeEqually,
+  type ItemKind,
   MEMO_MAX_LENGTH,
   NAME_MAX_LENGTH,
 } from "@warikan/domain";
@@ -23,6 +24,7 @@ export type ItemFormValues = {
   name: string;
   purchasedOn: string | null;
   memo: string | null;
+  kind: ItemKind;
   payments: { userId: string; amount: number }[];
   shares: { userId: string; amount: number }[];
 };
@@ -32,6 +34,7 @@ export type ItemFormInitial = {
   name: string;
   purchasedOn: string;
   memo: string;
+  kind: ItemKind;
   payments: Record<string, string>;
   shares: Record<string, string>;
 };
@@ -47,6 +50,9 @@ type ItemFormProps = {
   // 購入日が選択されているときに、購入日欄の直下へ差し込む任意の注記。
   // 「この日にもう入力済みか」の確認表示などに使う（取得・表示は呼び出し側に委ね、本体には依存を持たせない）。
   renderPurchasedOnNote?: (purchasedOn: string) => ReactNode;
+  // kind（支出/収入）が切り替わるたびに通知する。呼び出し側の見出し文言（「◯◯に購入品を入力」等）を
+  // 追従させたい場合に使う任意フック（本体は自身の内部状態だけで完結するため必須ではない）。
+  onKindChange?: (kind: ItemKind) => void;
   onSubmit: (values: ItemFormValues) => Promise<void>;
 };
 
@@ -72,6 +78,7 @@ export function ItemForm({
   resetAfterSubmit = false,
   successMessage,
   renderPurchasedOnNote,
+  onKindChange,
   onSubmit,
 }: ItemFormProps) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -79,6 +86,9 @@ export function ItemForm({
   // 入力ステップを 1 つ減らせる。編集時は保存済みの購入日をそのまま使う（等分の !initial と同じ考え方）。
   const [purchasedOn, setPurchasedOn] = useState(initial?.purchasedOn ?? todayLocal());
   const [memo, setMemo] = useState(initial?.memo ?? "");
+  // 支出（割り勘）/ 収入（分配）の切替。役割反転方式: income では payments=受取額、
+  // shares=分担額として扱う（構造は変えず意味づけだけ切り替える）。
+  const [kind, setKind] = useState<ItemKind>(initial?.kind ?? "expense");
   // 入力中の値は文字列で保持する（空欄と 0 を区別し、IME や前ゼロ等の編集を妨げない）。
   const [payments, setPayments] = useState<Record<string, string>>(initial?.payments ?? EMPTY);
   const [shares, setShares] = useState<Record<string, string>>(initial?.shares ?? EMPTY);
@@ -95,6 +105,38 @@ export function ItemForm({
   const paymentTotal = totalOf(payments, memberIds);
   const shareTotal = totalOf(shares, memberIds);
   const deficit = paymentTotal - shareTotal;
+  const isIncome = kind === "income";
+
+  // kind に応じた文言（デザイン: Income Split Mode 1A）。金額の入力・検証ロジックは
+  // 支出・収入で変わらず、ラベルの出し分けだけで役割反転を表現する。
+  const labels = isIncome
+    ? {
+        nameLabel: "名目",
+        namePlaceholder: "例: 臨時給付金",
+        dateLabel: "入金日（任意）",
+        payTitle: "受取額",
+        shareTitle: "分担額",
+        paySuffix: "の受取額",
+        shareSuffix: "の分担額",
+        equalLabel: "等分（受取額合計を人数で等分し、端数は自動で振り分け）",
+        diffPrefix: "受取額合計との差: ",
+      }
+    : {
+        nameLabel: "購入品名",
+        namePlaceholder: "例: ランチ",
+        dateLabel: "購入日（任意）",
+        payTitle: "支払額",
+        shareTitle: "割勘金額",
+        paySuffix: "の支払額",
+        shareSuffix: "の割勘金額",
+        equalLabel: "等分（支払額合計を人数で等分し、端数は自動で振り分け）",
+        diffPrefix: "支払額合計との差: ",
+      };
+
+  function handleKindChange(next: ItemKind) {
+    setKind(next);
+    onKindChange?.(next);
+  }
 
   // 等分の割勘金額を計算して shares に反映する。端数のランダム振り分け結果はこの呼び出し時点で
   // 確定し、以降は state に保持されて再描画では変わらない（等分 ON 化・支払額変更などの操作時のみ
@@ -166,6 +208,7 @@ export function ItemForm({
         name: name.trim(),
         purchasedOn: purchasedOn || null,
         memo: memo.trim() || null,
+        kind,
         payments: toEntries(payments),
         shares: toEntries(shares),
       });
@@ -177,6 +220,7 @@ export function ItemForm({
         setPayments(EMPTY);
         setShares(EMPTY);
         setEqualSplit(true);
+        // kind はリセットしない（デザイン方針: 保存後もモードが残るので連続入力向き）。
       }
       // 完了フィードバック（SaveCheck）を再生する。連続保存でも毎回再生されるよう連番を進める。
       setSavedTick((tick) => tick + 1);
@@ -189,21 +233,43 @@ export function ItemForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex w-full max-w-md flex-col gap-6">
+      {/* 支出（割り勘）/ 収入（分配）の切替セグメント（Income Split Mode デザイン 1A）。 */}
+      <div className="grid grid-cols-2 border-2 border-ink text-sm font-bold tracking-wide">
+        <button
+          type="button"
+          onClick={() => handleKindChange("expense")}
+          aria-pressed={!isIncome}
+          className={!isIncome ? "bg-ink py-2.5 text-paper" : "bg-transparent py-2.5 text-muted"}
+        >
+          支出（割り勘）
+        </button>
+        <button
+          type="button"
+          onClick={() => handleKindChange("income")}
+          aria-pressed={isIncome}
+          className={`border-l-2 border-ink ${
+            isIncome ? "bg-ink py-2.5 text-paper" : "bg-transparent py-2.5 text-muted"
+          }`}
+        >
+          収入（分配）
+        </button>
+      </div>
+
       <section className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-bold">購入品名</span>
+          <span className="text-sm font-bold">{labels.nameLabel}</span>
           <input
             type="text"
             required
             maxLength={NAME_MAX_LENGTH}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="例: ランチ"
+            placeholder={labels.namePlaceholder}
             className="field"
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-bold">購入日（任意）</span>
+          <span className="text-sm font-bold">{labels.dateLabel}</span>
           <input
             type="date"
             value={purchasedOn}
@@ -231,7 +297,7 @@ export function ItemForm({
         <>
           <section className="flex flex-col gap-3">
             <div className="section-rule flex items-baseline justify-between">
-              <h2 className="section-title">支払額</h2>
+              <h2 className="section-title">{labels.payTitle}</h2>
               <span className="text-sm font-bold tabular-nums">
                 合計 {formatAmount(paymentTotal)} 円
               </span>
@@ -239,14 +305,14 @@ export function ItemForm({
             <AmountInputList
               members={members}
               values={payments}
-              labelSuffix="の支払額"
+              labelSuffix={labels.paySuffix}
               onChange={handlePaymentChange}
             />
           </section>
 
           <section className="flex flex-col gap-3">
             <div className="section-rule flex items-baseline justify-between">
-              <h2 className="section-title">割勘金額</h2>
+              <h2 className="section-title">{labels.shareTitle}</h2>
               <span className="text-sm font-bold tabular-nums">
                 合計 {formatAmount(shareTotal)} 円
               </span>
@@ -258,12 +324,12 @@ export function ItemForm({
                 checked={equalSplit}
                 onChange={(e) => handleEqualSplitToggle(e.target.checked)}
               />
-              <span>等分（支払額合計を人数で等分し、端数は自動で振り分け）</span>
+              <span>{labels.equalLabel}</span>
             </label>
             <AmountInputList
               members={members}
               values={shares}
-              labelSuffix="の割勘金額"
+              labelSuffix={labels.shareSuffix}
               onChange={handleShareChange}
               renderRowEnd={(userId) => (
                 <button
@@ -281,7 +347,8 @@ export function ItemForm({
             {/* 過不足の表示。0 なら一致。 */}
             {deficit !== 0 && (
               <p className="text-sm font-medium tabular-nums text-warn">
-                支払額合計との差: {deficit > 0 ? `不足 ${deficit}` : `超過 ${-deficit}`} 円
+                {labels.diffPrefix}
+                {deficit > 0 ? `不足 ${deficit}` : `超過 ${-deficit}`} 円
               </p>
             )}
           </section>

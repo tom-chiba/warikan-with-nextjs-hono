@@ -1,0 +1,1 @@
+ALTER TABLE `item` ADD `kind` text DEFAULT 'expense' NOT NULL;

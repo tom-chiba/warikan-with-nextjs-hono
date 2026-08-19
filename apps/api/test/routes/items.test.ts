@@ -9,6 +9,7 @@ type CreateItemBody = {
   name: string;
   purchasedOn?: string | null;
   memo?: string | null;
+  kind?: "expense" | "income";
   payments: { userId: string; amount: number }[];
   shares: { userId: string; amount: number }[];
 };
@@ -86,6 +87,49 @@ describe("POST /groups/:groupId/items（購入品の保存）", () => {
       .first<{ memo: string | null; purchased_on: number | null }>();
     expect(item?.memo).toBeNull();
     expect(item?.purchased_on).toBeNull();
+  });
+
+  it("kind を省略すると expense として保存される", async () => {
+    const cookie = await signUpAndGetCookie("item-kind-default@example.com");
+    const userId = await getUserId(env.DB, "item-kind-default@example.com");
+    const groupId = await createGroup(cookie);
+
+    const res = await postItem(cookie, groupId, {
+      name: "コーヒー",
+      payments: [{ userId, amount: 300 }],
+      shares: [{ userId, amount: 300 }],
+    });
+
+    const { id } = (await res.json()) as { id: string };
+    const item = await env.DB.prepare("SELECT kind FROM item WHERE id = ?")
+      .bind(id)
+      .first<{ kind: string }>();
+    expect(item?.kind).toBe("expense");
+  });
+
+  it("kind: income で保存でき、そのまま返る（収入分配機能）", async () => {
+    const cookie = await signUpAndGetCookie("item-kind-income@example.com");
+    const userId = await getUserId(env.DB, "item-kind-income@example.com");
+    const groupId = await createGroup(cookie);
+
+    const res = await postItem(cookie, groupId, {
+      name: "臨時給付金",
+      kind: "income",
+      payments: [{ userId, amount: 120000 }],
+      shares: [{ userId, amount: 120000 }],
+    });
+
+    expect(res.status).toBe(201);
+    const { id } = (await res.json()) as { id: string };
+    const item = await env.DB.prepare("SELECT kind FROM item WHERE id = ?")
+      .bind(id)
+      .first<{ kind: string }>();
+    expect(item?.kind).toBe("income");
+
+    const got = await getItem(cookie, groupId, id);
+    const { item: fetched } = (await got.json()) as { item: ListedItem };
+    expect(fetched.kind).toBe("income");
+    expect(fetched.total).toBe(120000);
   });
 
   it("支払額合計 ≠ 割勘金額合計 なら 400 で保存されない", async () => {
@@ -260,6 +304,7 @@ type ListedItem = {
   purchasedOn: string | null;
   total: number;
   status: string;
+  kind: "expense" | "income";
   payments: { userId: string; amount: number }[];
   shares: { userId: string; amount: number }[];
 };
@@ -602,6 +647,37 @@ describe("POST /groups/:groupId/settlements（精算実行）", () => {
       items: ListedItem[];
     };
     expect(unsettled.items.map((i) => i.id)).toEqual([itemId]);
+  });
+
+  it("income と expense が混在しても正しい送金リストで精算できる（収入分配機能）", async () => {
+    const ownerCookie = await signUpAndGetCookie("settle-income-owner@example.com");
+    const ownerId = await getUserId(env.DB, "settle-income-owner@example.com");
+    await signUpAndGetCookie("settle-income-friend@example.com");
+    const friendId = await getUserId(env.DB, "settle-income-friend@example.com");
+    const groupId = await createGroup(ownerCookie);
+    await addMember(groupId, friendId);
+
+    // 収入 900 を owner が受け取り、2 人で 450 ずつ分担 → owner が friend に 450 円払う側になる。
+    const income = await postItem(ownerCookie, groupId, {
+      name: "臨時給付金",
+      kind: "income",
+      payments: [{ userId: ownerId, amount: 900 }],
+      shares: [
+        { userId: ownerId, amount: 450 },
+        { userId: friendId, amount: 450 },
+      ],
+    });
+    const incomeId = ((await income.json()) as { id: string }).id;
+
+    const res = await settle(
+      ownerCookie,
+      groupId,
+      [incomeId],
+      [{ from: ownerId, to: friendId, amount: 450 }],
+    );
+    expect(res.status).toBe(200);
+    const { settled } = (await res.json()) as { settled: string[] };
+    expect(settled).toEqual([incomeId]);
   });
 
   it("存在しない・他グループ・精算済みの id が混じっていたら 409 で拒否され、何も更新されない", async () => {

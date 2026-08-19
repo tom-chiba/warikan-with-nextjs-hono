@@ -91,6 +91,7 @@ test("保存すると指定グループへ POST し、成功メッセージを�
         name: "ランチ",
         purchasedOn: todayLocal(),
         memo: null,
+        kind: "expense",
         payments: [{ userId: "u1", amount: 1000 }],
         shares: [
           { userId: "u1", amount: 500 },
