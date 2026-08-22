@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # mise.toml から Node / pnpm のバージョンを再現する（ローカルと同一）。
-      - uses: jdx/mise-action@v4.2.4
+      - uses: jdx/mise-action@v4.2.5
 
       # ロックファイルとの差分を許さずインストール。
       - run: pnpm $PNPM_FLAGS install --frozen-lockfile
@@ -45,7 +45,7 @@ jobs:
       PNPM_FLAGS: ${{ startsWith(github.head_ref, 'dependabot/') && '--config.minimumReleaseAge=0' || '' }}
     steps:
       - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v4.2.4
+      - uses: jdx/mise-action@v4.2.5
       - run: pnpm $PNPM_FLAGS install --frozen-lockfile
 
       # wrangler.jsonc の vars には本番 URL が入るため、E2E(localhost) 用に .dev.vars で上書きする。
