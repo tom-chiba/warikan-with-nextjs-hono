@@ -291,6 +291,25 @@ test("送金リストのシートでは Tab のフォーカスがシート内で
   expect(settleButton).toHaveFocus();
 });
 
+test("精算中に精算ボタンが disabled になっても Tab はシート内に留まる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+  // 精算リクエストを保留にして、精算ボタンが disabled のままの状態を作る。
+  settleMock.mockReturnValue(new Promise(() => {}));
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const sheet = await openSettlementSheet();
+  const settleButton = within(sheet).getByRole("button", { name: /精算する/ });
+  await userEvent.click(settleButton);
+  await waitFor(() => expect(settleButton).toBeDisabled());
+
+  await userEvent.tab();
+  expect(within(sheet).getByRole("button", { name: "閉じる" })).toHaveFocus();
+});
+
 test("送金リストのシートは暗幕のタップでも閉じる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });

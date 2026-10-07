@@ -97,11 +97,14 @@ export function SettlementSheet({
       if (!first || !last) {
         return;
       }
+      // フォーカスが循環対象のボタン以外にある場合（シート外、または精算中に disabled になった
+      // 精算ボタンに残っている場合）も、端に居るのと同じく循環させる。
       const active = document.activeElement;
-      if (e.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+      const outside = !(active instanceof HTMLElement) || !Array.from(focusable).includes(active);
+      if (e.shiftKey && (active === first || outside)) {
         e.preventDefault();
         last.focus();
-      } else if (!e.shiftKey && (active === last || !dialogRef.current.contains(active))) {
+      } else if (!e.shiftKey && (active === last || outside)) {
         e.preventDefault();
         first.focus();
       }
