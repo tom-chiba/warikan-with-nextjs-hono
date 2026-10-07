@@ -75,7 +75,7 @@ export function SettlementSheet({
 
   return (
     <div className="fixed inset-0 z-50">
-      <div aria-hidden className="absolute inset-0 bg-ink/40" onClick={onClose} />
+      <div aria-hidden className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
