@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { formatAmount } from "@/lib/format";
 
 // 送金リストの 1 行分。表示名は呼び出し側で解決済みのものを渡す。
@@ -62,6 +62,24 @@ export function SettlementSheet({
   onSettle: () => void;
   onClose: () => void;
 }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // モーダルとしての振る舞い: 開いている間は背面のスクロールを止め、閉じるボタンへフォーカスを移し、
+  // 閉じたら開く前の要素（サマリーバー）へフォーカスを戻す。
+  // autoFocus は開く前の activeElement を取る前に走ってしまうため、ここで明示的に行う。
+  useEffect(() => {
+    const opener = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      if (opener instanceof HTMLElement) {
+        opener.focus();
+      }
+    };
+  }, []);
+
   // Escape で閉じる。
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -86,7 +104,7 @@ export function SettlementSheet({
           <h2 className="section-title">送金リスト</h2>
           <span className="flex items-center gap-3">
             <span className="text-sm font-bold tabular-nums">選択 {count} 件</span>
-            <button type="button" autoFocus onClick={onClose} className="btn btn-line btn-sm">
+            <button type="button" ref={closeRef} onClick={onClose} className="btn btn-line btn-sm">
               閉じる
             </button>
           </span>

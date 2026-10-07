@@ -19,8 +19,8 @@ export function UnsettledView({ groupId }: { groupId: string }) {
 
   // 選択中のアイテム id。複数選択 → 送金計算（#21）・精算実行（#22）の対象。
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  // 送金リストのシートの開閉。選択が 0 件になるとシートごと消えるが、state は残るため、
-  // 精算成功時など選択を空にする箇所では必ず false に戻す（次の選択で開いたまま復活させない）。
+  // 送金リストのシートの開閉。選択が 0 件になったら下のレンダー中リセットで false に戻る
+  //（精算成功・削除・409 後の一覧更新のどれでも。次の選択で開いたまま復活させない）。
   const [sheetOpen, setSheetOpen] = useState(false);
   const closeSheet = () => setSheetOpen(false);
 
@@ -138,7 +138,6 @@ export function UnsettledView({ groupId }: { groupId: string }) {
         throw new Error("精算対象がありませんでした（既に精算済みか削除済みの可能性があります）");
       }
       setSelected(new Set());
-      setSheetOpen(false);
     }, "精算に失敗しました");
   }
 
@@ -187,13 +186,12 @@ export function UnsettledView({ groupId }: { groupId: string }) {
         <>
           {/* 固定バーに一覧末尾が隠れないための余白。 */}
           <div aria-hidden className="h-16" />
-          {!sheetOpen && (
-            <SettlementBar
-              count={selectedItems.length}
-              transfers={transferRows}
-              onOpen={() => setSheetOpen(true)}
-            />
-          )}
+          {/* シート表示中もバーは残す（シートが覆う）。閉じたときのフォーカス復帰先になる。 */}
+          <SettlementBar
+            count={selectedItems.length}
+            transfers={transferRows}
+            onOpen={() => setSheetOpen(true)}
+          />
           {sheetOpen && (
             <SettlementSheet
               count={selectedItems.length}

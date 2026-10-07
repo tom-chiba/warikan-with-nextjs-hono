@@ -201,7 +201,48 @@ test("選択すると画面下のサマリーバーに最大の送金が出て�
   expect(within(list.closest("li") as HTMLElement).getByText("500 円")).toBeInTheDocument();
 });
 
-test("送金リストのシートは閉じるボタンと Escape で閉じ、バーに戻る", async () => {
+test("送金が複数あるときバーには最大の送金と「ほか N 件」が出る", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 3 人目を加え、owner が 3000 立替・負担は 600 / 1000 / 1400 → フレンド 1,000 円・タロウ 1,400 円を owner に送る。
+  membersGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      members: [
+        ...members.members,
+        {
+          userId: "taro",
+          name: "タロウ",
+          displayName: null,
+          email: "t@example.com",
+          role: "member",
+          joinedAt: "z",
+        },
+      ],
+    }),
+  });
+  const groupItem = {
+    ...lunchItem,
+    total: 3000,
+    payments: [{ userId: "owner", amount: 3000 }],
+    shares: [
+      { userId: "owner", amount: 600 },
+      { userId: "friend", amount: 1000 },
+      { userId: "taro", amount: 1400 },
+    ],
+  };
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [groupItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const bar = await screen.findByRole("button", { name: /送金リスト/ });
+  expect(within(bar).getByText("選択 1 件 · 送金 2 件")).toBeInTheDocument();
+  // 最大額（タロウ → オーナー 1,400 円）が選ばれ、残りは件数で示される。
+  expect(within(bar).getByText("タロウ → オーナー 1,400 円 ほか 1 件")).toBeInTheDocument();
+});
+
+test("送金リストのシートは閉じるボタンと Escape で閉じ、バーにフォーカスが戻る", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
 
@@ -210,15 +251,37 @@ test("送金リストのシートは閉じるボタンと Escape で閉じ、バ
   await userEvent.click(await screen.findByLabelText("ランチ を選択"));
 
   const sheet = await openSettlementSheet();
+  // 開いている間は背面のスクロールを止め、閉じるボタンにフォーカスが移る。
+  expect(document.body.style.overflow).toBe("hidden");
+  expect(within(sheet).getByRole("button", { name: "閉じる" })).toHaveFocus();
+
   await userEvent.click(within(sheet).getByRole("button", { name: "閉じる" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  // 閉じても選択は保たれ、バーから開き直せる。
+  expect(document.body.style.overflow).not.toBe("hidden");
+  // 閉じても選択は保たれ、フォーカスは開いたバーに戻り、バーから開き直せる。
   expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toHaveFocus();
 
   await openSettlementSheet();
   await userEvent.keyboard("{Escape}");
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
+});
+
+test("送金リストのシートは暗幕のタップでも閉じる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const sheet = await openSettlementSheet();
+  // 暗幕は装飾（aria-hidden）なので、ダイアログの直前の兄弟要素として取得する。
+  await userEvent.click(sheet.previousElementSibling as HTMLElement);
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
 });
 
 test("選択分の収支が均衡しているときはバーに「送金は不要です」、シートに均衡の案内が出る", async () => {
@@ -264,6 +327,45 @@ test("精算するとボタンで選択 id と確認済み送金リストが set
       json: { itemIds: ["i1"], transfers: [{ from: "friend", to: "owner", amount: 500 }] },
     });
   });
+  // 精算が成功したらシートもバーも消え、選択も解除される。
+  await waitFor(() => {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  expect(screen.queryByRole("button", { name: /送金リスト/ })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("ランチ を選択")).not.toBeChecked();
+
+  // 次の選択でシートが開いたまま復活せず、バーだけが出る。
+  await userEvent.click(screen.getByLabelText("ランチ を選択"));
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("シートを開いたまま選択アイテムが一覧から消えたら閉じ、次の選択で開いたまま復活しない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 1 回目の取得はランチのみ。409 後の再取得ではランチが消えてディナーだけになる（他端末で精算済み等）。
+  itemsGetMock
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ items: [lunchItem] }) })
+    .mockResolvedValue({ ok: true, json: async () => ({ items: [dinnerItem] }) });
+  settleMock.mockResolvedValue({
+    ok: false,
+    status: 409,
+    json: async () => ({ error: "一覧が古くなっています" }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await openSettlementSheet();
+  await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
+
+  await waitFor(() => {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  expect(screen.queryByRole("button", { name: /送金リスト/ })).not.toBeInTheDocument();
+
+  await userEvent.click(await screen.findByLabelText("ディナー を選択"));
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 test("収入アイテムを選択すると、受取人が支払う側に反転した送金リストが表示・送信される（収入分配機能）", async () => {
@@ -335,7 +437,10 @@ test("精算が 0 件更新だったら警告を表示する", async () => {
   await openSettlementSheet();
   await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
 
-  expect(await screen.findByText(/精算対象がありませんでした/)).toBeInTheDocument();
+  // シートが背面を覆うので、警告はシート内に表示される（ページ側には重複して出さない）。
+  const sheet = await screen.findByRole("dialog", { name: "送金リスト" });
+  expect(await within(sheet).findByText(/精算対象がありませんでした/)).toBeInTheDocument();
+  expect(screen.getAllByText(/精算対象がありませんでした/)).toHaveLength(1);
 });
 
 test("削除ボタンで該当アイテムの DELETE が呼ばれる", async () => {
@@ -407,7 +512,8 @@ test("全件選択済みで全て選択チェックボックスを押すと全�
   expect(screen.getByLabelText("ランチ を選択")).not.toBeChecked();
   expect(screen.getByLabelText("ディナー を選択")).not.toBeChecked();
   expect(selectAll).not.toBeChecked();
-  expect(screen.queryByText(/送金リスト/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /送金リスト/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 test("一部選択のとき全て選択チェックボックスは indeterminate になり、押すと全件選択される", async () => {
