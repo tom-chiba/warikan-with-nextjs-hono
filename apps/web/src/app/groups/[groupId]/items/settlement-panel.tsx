@@ -62,6 +62,7 @@ export function SettlementSheet({
   onSettle: () => void;
   onClose: () => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // モーダルとしての振る舞い: 開いている間は背面のスクロールを止め、閉じるボタンへフォーカスを移し、
@@ -80,11 +81,29 @@ export function SettlementSheet({
     };
   }, []);
 
-  // Escape で閉じる。
+  // Escape で閉じ、Tab はシート内で循環させる（aria-modal の宣言どおり背面へ抜けさせない）。
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialogRef.current) {
+        return;
+      }
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled])");
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) {
+        return;
+      }
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !dialogRef.current.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !dialogRef.current.contains(active))) {
+        e.preventDefault();
+        first.focus();
       }
     }
     document.addEventListener("keydown", onKeyDown);
@@ -95,6 +114,7 @@ export function SettlementSheet({
     <div className="fixed inset-0 z-50">
       <div aria-hidden className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="送金リスト"

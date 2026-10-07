@@ -268,6 +268,29 @@ test("送金リストのシートは閉じるボタンと Escape で閉じ、バ
   expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
 });
 
+test("送金リストのシートでは Tab のフォーカスがシート内で循環し、背面へ抜けない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const sheet = await openSettlementSheet();
+  const closeButton = within(sheet).getByRole("button", { name: "閉じる" });
+  const settleButton = within(sheet).getByRole("button", { name: /精算する/ });
+  expect(closeButton).toHaveFocus();
+
+  await userEvent.tab();
+  expect(settleButton).toHaveFocus();
+  // 末尾から先頭へ循環する。
+  await userEvent.tab();
+  expect(closeButton).toHaveFocus();
+  // 先頭から Shift+Tab で末尾へ循環する。
+  await userEvent.tab({ shift: true });
+  expect(settleButton).toHaveFocus();
+});
+
 test("送金リストのシートは暗幕のタップでも閉じる", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
