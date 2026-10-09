@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { computeSettlements } from "@warikan/domain";
 import { itemKeys } from "@/lib/query-keys";
@@ -22,6 +22,7 @@ export function UnsettledView({ groupId }: { groupId: string }) {
   // 送金リストのシートの開閉。選択が 0 件になったら下のレンダー中リセットで false に戻る
   //（精算成功・削除・409 後の一覧更新のどれでも。次の選択で開いたまま復活させない）。
   const [sheetOpen, setSheetOpen] = useState(false);
+  const settlementBarRef = useRef<HTMLButtonElement>(null);
   const closeSheet = () => setSheetOpen(false);
 
   // 未精算アイテム一覧（#19）。各 item に合計金額・payments・shares を含む。
@@ -188,12 +189,14 @@ export function UnsettledView({ groupId }: { groupId: string }) {
           <div aria-hidden className="h-16" />
           {/* シート表示中もバーは残す（シートが覆う）。閉じたときのフォーカス復帰先になる。 */}
           <SettlementBar
+            buttonRef={settlementBarRef}
             count={selectedItems.length}
             transfers={transferRows}
             onOpen={() => setSheetOpen(true)}
           />
           {sheetOpen && (
             <SettlementSheet
+              returnFocusRef={settlementBarRef}
               count={selectedItems.length}
               transfers={transferRows}
               busy={busy}

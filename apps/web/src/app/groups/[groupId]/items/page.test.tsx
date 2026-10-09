@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { renderWithClient } from "@/test/render-with-client";
@@ -267,6 +267,37 @@ test("送金リストのシートは閉じるボタンと Escape で閉じ、バ
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
 });
+
+test.each(["閉じるボタン", "Escape", "暗幕"])(
+  "バーへのクリックでフォーカスが移らなくても、%sで閉じるとバーにフォーカスが戻る",
+  async (closeMethod) => {
+    useSessionMock.mockReturnValue(loggedIn);
+    itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+    renderWithClient(<ItemsPage />);
+
+    const checkbox = await screen.findByLabelText("ランチ を選択");
+    await userEvent.click(checkbox);
+    expect(checkbox).toHaveFocus();
+
+    const bar = screen.getByRole("button", { name: /送金リスト/ });
+    // Safari のクリックを再現し、バーへのフォーカス移動なしでシートを開く。
+    fireEvent.click(bar);
+    const sheet = await screen.findByRole("dialog", { name: "送金リスト" });
+    expect(within(sheet).getByRole("button", { name: "閉じる" })).toHaveFocus();
+
+    if (closeMethod === "Escape") {
+      await userEvent.keyboard("{Escape}");
+    } else if (closeMethod === "暗幕") {
+      fireEvent.click(sheet.previousElementSibling as HTMLElement);
+    } else {
+      await userEvent.click(within(sheet).getByRole("button", { name: "閉じる" }));
+    }
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(bar).toHaveFocus();
+  },
+);
 
 test("送金リストのシートでは Tab のフォーカスがシート内で循環し、背面へ抜けない", async () => {
   useSessionMock.mockReturnValue(loggedIn);

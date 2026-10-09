@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { formatAmount } from "@/lib/format";
 
 // 送金リストの 1 行分。表示名は呼び出し側で解決済みのものを渡す。
@@ -12,10 +12,12 @@ export function SettlementBar({
   count,
   transfers,
   onOpen,
+  buttonRef,
 }: {
   count: number;
   transfers: TransferRow[];
   onOpen: () => void;
+  buttonRef: RefObject<HTMLButtonElement | null>;
 }) {
   const top = transfers.reduce<TransferRow | undefined>(
     (max, t) => (max === undefined || t.amount > max.amount ? t : max),
@@ -29,6 +31,7 @@ export function SettlementBar({
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onOpen}
       className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 bg-ink px-5 pt-3.5 pb-[max(1.125rem,env(safe-area-inset-bottom))] text-left text-paper"
@@ -54,6 +57,7 @@ export function SettlementSheet({
   error,
   onSettle,
   onClose,
+  returnFocusRef,
 }: {
   count: number;
   transfers: TransferRow[];
@@ -61,25 +65,26 @@ export function SettlementSheet({
   error: string | null;
   onSettle: () => void;
   onClose: () => void;
+  returnFocusRef: RefObject<HTMLButtonElement | null>;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // モーダルとしての振る舞い: 開いている間は背面のスクロールを止め、閉じるボタンへフォーカスを移し、
-  // 閉じたら開く前の要素（サマリーバー）へフォーカスを戻す。
-  // autoFocus は開く前の activeElement を取る前に走ってしまうため、ここで明示的に行う。
+  // 閉じたらサマリーバーへフォーカスを戻す。クリックでボタンにフォーカスしない
+  // Safari でも復帰できるよう、呼び出し側から復帰先の ref を受け取る。
   useEffect(() => {
-    const opener = document.activeElement;
+    const opener = returnFocusRef.current;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
     return () => {
       document.body.style.overflow = prevOverflow;
-      if (opener instanceof HTMLElement) {
+      if (opener?.isConnected) {
         opener.focus();
       }
     };
-  }, []);
+  }, [returnFocusRef]);
 
   // Escape で閉じ、Tab はシート内で循環させる（aria-modal の宣言どおり背面へ抜けさせない）。
   useEffect(() => {
