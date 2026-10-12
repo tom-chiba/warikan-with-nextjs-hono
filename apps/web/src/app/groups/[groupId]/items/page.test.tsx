@@ -1,4 +1,4 @@
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { renderWithClient } from "@/test/render-with-client";
@@ -175,7 +175,74 @@ test("0 件のときは空表示になる", async () => {
   expect(await screen.findByText("未精算のアイテムはありません。")).toBeInTheDocument();
 });
 
-test("選択すると送金リスト（誰 → 誰 / 金額）が表示される", async () => {
+// 選択後に画面下へ出るサマリーバーをタップして、送金リストのシートを開く。
+async function openSettlementSheet() {
+  await userEvent.click(screen.getByRole("button", { name: /送金リスト/ }));
+  return screen.findByRole("dialog", { name: "送金リスト" });
+}
+
+test("選択すると画面下のサマリーバーに最大の送金が出て、タップで送金リスト（誰 → 誰 / 金額）が開く", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  // バーには選択件数・送金件数と、最大の送金（friend が owner に 500 円）だけが出る。
+  const bar = screen.getByRole("button", { name: /送金リスト/ });
+  expect(within(bar).getByText("選択 1 件 · 送金 1 件")).toBeInTheDocument();
+  expect(within(bar).getByText("フレンド → オーナー 500 円")).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+  const sheet = await openSettlementSheet();
+  const list = within(sheet).getByText("フレンド → オーナー");
+  expect(within(list.closest("li") as HTMLElement).getByText("500 円")).toBeInTheDocument();
+});
+
+test("送金が複数あるときバーには最大の送金と「ほか N 件」が出る", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 3 人目を加え、owner が 3000 立替・負担は 600 / 1000 / 1400 → フレンド 1,000 円・タロウ 1,400 円を owner に送る。
+  membersGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      members: [
+        ...members.members,
+        {
+          userId: "taro",
+          name: "タロウ",
+          displayName: null,
+          email: "t@example.com",
+          role: "member",
+          joinedAt: "z",
+        },
+      ],
+    }),
+  });
+  const groupItem = {
+    ...lunchItem,
+    total: 3000,
+    payments: [{ userId: "owner", amount: 3000 }],
+    shares: [
+      { userId: "owner", amount: 600 },
+      { userId: "friend", amount: 1000 },
+      { userId: "taro", amount: 1400 },
+    ],
+  };
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [groupItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const bar = await screen.findByRole("button", { name: /送金リスト/ });
+  expect(within(bar).getByText("選択 1 件 · 送金 2 件")).toBeInTheDocument();
+  // 最大額（タロウ → オーナー 1,400 円）が選ばれ、残りは件数で示される。
+  expect(within(bar).getByText("タロウ → オーナー 1,400 円 ほか 1 件")).toBeInTheDocument();
+});
+
+test("送金リストのシートは閉じるボタンと Escape で閉じ、バーにフォーカスが戻る", async () => {
   useSessionMock.mockReturnValue(loggedIn);
   itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
 
@@ -183,10 +250,136 @@ test("選択すると送金リスト（誰 → 誰 / 金額）が表示される
 
   await userEvent.click(await screen.findByLabelText("ランチ を選択"));
 
-  // friend が owner に 500 円。
-  const list = await screen.findByText("フレンド → オーナー");
-  expect(list).toBeInTheDocument();
-  expect(within(list.closest("li") as HTMLElement).getByText("500 円")).toBeInTheDocument();
+  const sheet = await openSettlementSheet();
+  // 開いている間は背面のスクロールを止め、閉じるボタンにフォーカスが移る。
+  expect(document.body.style.overflow).toBe("hidden");
+  expect(within(sheet).getByRole("button", { name: "閉じる" })).toHaveFocus();
+
+  await userEvent.click(within(sheet).getByRole("button", { name: "閉じる" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(document.body.style.overflow).not.toBe("hidden");
+  // 閉じても選択は保たれ、フォーカスは開いたバーに戻り、バーから開き直せる。
+  expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toHaveFocus();
+
+  await openSettlementSheet();
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
+});
+
+test.each(["閉じるボタン", "Escape", "暗幕"])(
+  "バーへのクリックでフォーカスが移らなくても、%sで閉じるとバーにフォーカスが戻る",
+  async (closeMethod) => {
+    useSessionMock.mockReturnValue(loggedIn);
+    itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+    renderWithClient(<ItemsPage />);
+
+    const checkbox = await screen.findByLabelText("ランチ を選択");
+    await userEvent.click(checkbox);
+    expect(checkbox).toHaveFocus();
+
+    const bar = screen.getByRole("button", { name: /送金リスト/ });
+    // Safari のクリックを再現し、バーへのフォーカス移動なしでシートを開く。
+    fireEvent.click(bar);
+    const sheet = await screen.findByRole("dialog", { name: "送金リスト" });
+    expect(within(sheet).getByRole("button", { name: "閉じる" })).toHaveFocus();
+
+    if (closeMethod === "Escape") {
+      await userEvent.keyboard("{Escape}");
+    } else if (closeMethod === "暗幕") {
+      fireEvent.click(sheet.previousElementSibling as HTMLElement);
+    } else {
+      await userEvent.click(within(sheet).getByRole("button", { name: "閉じる" }));
+    }
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(bar).toHaveFocus();
+  },
+);
+
+test("送金リストのシートでは Tab のフォーカスがシート内で循環し、背面へ抜けない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const sheet = await openSettlementSheet();
+  const closeButton = within(sheet).getByRole("button", { name: "閉じる" });
+  const settleButton = within(sheet).getByRole("button", { name: /精算する/ });
+  expect(closeButton).toHaveFocus();
+
+  await userEvent.tab();
+  expect(settleButton).toHaveFocus();
+  // 末尾から先頭へ循環する。
+  await userEvent.tab();
+  expect(closeButton).toHaveFocus();
+  // 先頭から Shift+Tab で末尾へ循環する。
+  await userEvent.tab({ shift: true });
+  expect(settleButton).toHaveFocus();
+});
+
+test("精算中に精算ボタンが disabled になっても Tab はシート内に留まる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+  // 精算リクエストを保留にして、精算ボタンが disabled のままの状態を作る。
+  settleMock.mockReturnValue(new Promise(() => {}));
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const sheet = await openSettlementSheet();
+  const settleButton = within(sheet).getByRole("button", { name: /精算する/ });
+  await userEvent.click(settleButton);
+  await waitFor(() => expect(settleButton).toBeDisabled());
+
+  await userEvent.tab();
+  expect(within(sheet).getByRole("button", { name: "閉じる" })).toHaveFocus();
+});
+
+test("送金リストのシートは暗幕のタップでも閉じる", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  itemsGetMock.mockResolvedValue({ ok: true, json: async () => ({ items: [lunchItem] }) });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+
+  const sheet = await openSettlementSheet();
+  // 暗幕は装飾（aria-hidden）なので、ダイアログの直前の兄弟要素として取得する。
+  await userEvent.click(sheet.previousElementSibling as HTMLElement);
+
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
+});
+
+test("選択分の収支が均衡しているときはバーに「送金は不要です」、シートに均衡の案内が出る", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // owner が 1000 立替、owner/friend で 500 ずつ負担する 1 件と、
+  // friend が 1000 立替、同じ負担の 1 件を選ぶと収支が相殺する。
+  const reverseItem = {
+    ...lunchItem,
+    id: "i9",
+    name: "夕食",
+    payments: [{ userId: "friend", amount: 1000 }],
+  };
+  itemsGetMock.mockResolvedValue({
+    ok: true,
+    json: async () => ({ items: [lunchItem, reverseItem] }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("全て選択"));
+
+  const bar = screen.getByRole("button", { name: /送金リスト/ });
+  expect(within(bar).getByText("送金は不要です")).toBeInTheDocument();
+  const sheet = await openSettlementSheet();
+  expect(within(sheet).getByText(/すでに均衡しています/)).toBeInTheDocument();
 });
 
 test("精算するとボタンで選択 id と確認済み送金リストが settlements に送られる", async () => {
@@ -197,6 +390,7 @@ test("精算するとボタンで選択 id と確認済み送金リストが set
   renderWithClient(<ItemsPage />);
 
   await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await openSettlementSheet();
   await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
 
   await waitFor(() => {
@@ -206,6 +400,45 @@ test("精算するとボタンで選択 id と確認済み送金リストが set
       json: { itemIds: ["i1"], transfers: [{ from: "friend", to: "owner", amount: 500 }] },
     });
   });
+  // 精算が成功したらシートもバーも消え、選択も解除される。
+  await waitFor(() => {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  expect(screen.queryByRole("button", { name: /送金リスト/ })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("ランチ を選択")).not.toBeChecked();
+
+  // 次の選択でシートが開いたまま復活せず、バーだけが出る。
+  await userEvent.click(screen.getByLabelText("ランチ を選択"));
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+});
+
+test("シートを開いたまま選択アイテムが一覧から消えたら閉じ、次の選択で開いたまま復活しない", async () => {
+  useSessionMock.mockReturnValue(loggedIn);
+  // 1 回目の取得はランチのみ。409 後の再取得ではランチが消えてディナーだけになる（他端末で精算済み等）。
+  itemsGetMock
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ items: [lunchItem] }) })
+    .mockResolvedValue({ ok: true, json: async () => ({ items: [dinnerItem] }) });
+  settleMock.mockResolvedValue({
+    ok: false,
+    status: 409,
+    json: async () => ({ error: "一覧が古くなっています" }),
+  });
+
+  renderWithClient(<ItemsPage />);
+
+  await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await openSettlementSheet();
+  await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
+
+  await waitFor(() => {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+  expect(screen.queryByRole("button", { name: /送金リスト/ })).not.toBeInTheDocument();
+
+  await userEvent.click(await screen.findByLabelText("ディナー を選択"));
+  expect(screen.getByRole("button", { name: /送金リスト/ })).toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 test("収入アイテムを選択すると、受取人が支払う側に反転した送金リストが表示・送信される（収入分配機能）", async () => {
@@ -227,6 +460,7 @@ test("収入アイテムを選択すると、受取人が支払う側に反転�
   renderWithClient(<ItemsPage />);
 
   await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await openSettlementSheet();
 
   const list = await screen.findByText("オーナー → フレンド");
   expect(within(list.closest("li") as HTMLElement).getByText("450 円")).toBeInTheDocument();
@@ -255,9 +489,14 @@ test("精算が 409（一覧が古い・送金リスト不一致）ならサー�
   renderWithClient(<ItemsPage />);
 
   await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await openSettlementSheet();
   await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
 
-  expect(await screen.findByText(/送金リストが最新のデータと一致しません/)).toBeInTheDocument();
+  // シートが背面を覆うので、エラーはシート内にも表示される。
+  const sheet = await screen.findByRole("dialog", { name: "送金リスト" });
+  expect(
+    await within(sheet).findByText(/送金リストが最新のデータと一致しません/),
+  ).toBeInTheDocument();
 });
 
 test("精算が 0 件更新だったら警告を表示する", async () => {
@@ -268,9 +507,13 @@ test("精算が 0 件更新だったら警告を表示する", async () => {
   renderWithClient(<ItemsPage />);
 
   await userEvent.click(await screen.findByLabelText("ランチ を選択"));
+  await openSettlementSheet();
   await userEvent.click(screen.getByRole("button", { name: /精算する/ }));
 
-  expect(await screen.findByText(/精算対象がありませんでした/)).toBeInTheDocument();
+  // シートが背面を覆うので、警告はシート内に表示される（ページ側には重複して出さない）。
+  const sheet = await screen.findByRole("dialog", { name: "送金リスト" });
+  expect(await within(sheet).findByText(/精算対象がありませんでした/)).toBeInTheDocument();
+  expect(screen.getAllByText(/精算対象がありませんでした/)).toHaveLength(1);
 });
 
 test("削除ボタンで該当アイテムの DELETE が呼ばれる", async () => {
@@ -322,9 +565,8 @@ test("全て選択チェックボックスで全アイテムが選択される",
   expect(screen.getByLabelText("ランチ を選択")).toBeChecked();
   expect(screen.getByLabelText("ディナー を選択")).toBeChecked();
   expect(selectAll).toBeChecked();
-  // 全 2 件が送金計算の対象になっている（見出しと選択件数は別要素で表示される）。
-  expect(screen.getByText("送金リスト")).toBeInTheDocument();
-  expect(screen.getByText("選択 2 件")).toBeInTheDocument();
+  // 全 2 件が送金計算の対象になっている（バーの選択件数で確認する）。
+  expect(screen.getByText(/選択 2 件/)).toBeInTheDocument();
 });
 
 test("全件選択済みで全て選択チェックボックスを押すと全件解除される", async () => {
@@ -343,7 +585,8 @@ test("全件選択済みで全て選択チェックボックスを押すと全�
   expect(screen.getByLabelText("ランチ を選択")).not.toBeChecked();
   expect(screen.getByLabelText("ディナー を選択")).not.toBeChecked();
   expect(selectAll).not.toBeChecked();
-  expect(screen.queryByText(/送金リスト/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /送金リスト/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 });
 
 test("一部選択のとき全て選択チェックボックスは indeterminate になり、押すと全件選択される", async () => {
