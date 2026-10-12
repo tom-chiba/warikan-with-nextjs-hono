@@ -27,7 +27,7 @@
     "@warikan/domain": "workspace:*",
     "better-auth": "^1.6.25",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.12.32",
+    "hono": "^4.12.34",
     "zod": "^4.4.3"
   },
   "devDependencies": {
