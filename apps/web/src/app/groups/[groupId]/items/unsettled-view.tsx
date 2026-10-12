@@ -2,13 +2,13 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { apiClient } from "@/lib/api-client";
 import { computeSettlements } from "@warikan/domain";
-import { formatAmount } from "@/lib/format";
 import { itemKeys } from "@/lib/query-keys";
 import { useGroupMembers } from "@/lib/use-group-members";
 import { ItemsTable } from "./items-table";
+import { SettlementBar, SettlementSheet, type TransferRow } from "./settlement-panel";
 import { useItemActions } from "./use-item-actions";
 
 // 未精算ビュー（#19〜#22）。一覧表示・編集削除・送金計算・精算実行を担う。
@@ -19,6 +19,11 @@ export function UnsettledView({ groupId }: { groupId: string }) {
 
   // 選択中のアイテム id。複数選択 → 送金計算（#21）・精算実行（#22）の対象。
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // 送金リストのシートの開閉。選択が 0 件になったら下のレンダー中リセットで false に戻る
+  //（精算成功・削除・409 後の一覧更新のどれでも。次の選択で開いたまま復活させない）。
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const settlementBarRef = useRef<HTMLButtonElement>(null);
+  const closeSheet = () => setSheetOpen(false);
 
   // 未精算アイテム一覧（#19）。各 item に合計金額・payments・shares を含む。
   const { data: itemsData, error: fetchError } = useQuery({
@@ -48,7 +53,20 @@ export function UnsettledView({ groupId }: { groupId: string }) {
   // 選択中かつ一覧に存在するアイテムだけを対象に送金リストを算出する
   //（削除・精算で一覧から消えた id を取り残さない）。
   const selectedItems = items.filter((i) => selected.has(i.id));
+  // 選択が空になった（409 後の一覧更新・削除など）ら、シートの開閉 state も閉じに戻す。
+  // 戻さないと、次に選択したとき開いたまま復活してしまう。
+  if (sheetOpen && selectedItems.length === 0) {
+    setSheetOpen(false);
+  }
+  // シート表示中は操作エラーをシート内に出す（背面のページ側では覆われて見えないため）。
+  const pageError = sheetOpen ? null : error;
   const transfers = computeSettlements(selectedItems);
+  const transferRows: TransferRow[] = transfers.map((t) => ({
+    key: `${t.from}->${t.to}`,
+    from: nameOf(t.from),
+    to: nameOf(t.to),
+    amount: t.amount,
+  }));
 
   function toggle(itemId: string) {
     setSelected((prev) => {
@@ -126,9 +144,9 @@ export function UnsettledView({ groupId }: { groupId: string }) {
 
   return (
     <>
-      {(error || fetchError) && (
+      {(pageError || fetchError) && (
         <p className="note-danger w-full">
-          {error ??
+          {pageError ??
             (fetchError instanceof Error
               ? fetchError.message
               : "未精算アイテムの取得に失敗しました")}
@@ -164,34 +182,30 @@ export function UnsettledView({ groupId }: { groupId: string }) {
         )}
       </section>
 
-      {/* 選択 → 送金リスト（#21）と精算実行（#22）。 */}
+      {/* 選択 → 送金リスト（#21）と精算実行（#22）。画面下のサマリーバー＋シートで見せる。 */}
       {selectedItems.length > 0 && (
-        <section className="flex w-full flex-col gap-3">
-          <div className="section-rule flex items-baseline justify-between">
-            <h2 className="section-title">送金リスト</h2>
-            <span className="text-sm font-bold tabular-nums">選択 {selectedItems.length} 件</span>
-          </div>
-          {transfers.length === 0 ? (
-            <p className="note-muted">選択分の収支はすでに均衡しています（送金は不要です）。</p>
-          ) : (
-            <ul className="flex flex-col">
-              {transfers.map((t) => (
-                <li
-                  key={`${t.from}->${t.to}`}
-                  className="flex items-center justify-between border-b border-rule px-1 py-2.5"
-                >
-                  <span>
-                    {nameOf(t.from)} → {nameOf(t.to)}
-                  </span>
-                  <span className="font-bold tabular-nums">{formatAmount(t.amount)} 円</span>
-                </li>
-              ))}
-            </ul>
+        <>
+          {/* 固定バーに一覧末尾が隠れないための余白。 */}
+          <div aria-hidden className="h-16" />
+          {/* シート表示中もバーは残す（シートが覆う）。閉じたときのフォーカス復帰先になる。 */}
+          <SettlementBar
+            buttonRef={settlementBarRef}
+            count={selectedItems.length}
+            transfers={transferRows}
+            onOpen={() => setSheetOpen(true)}
+          />
+          {sheetOpen && (
+            <SettlementSheet
+              returnFocusRef={settlementBarRef}
+              count={selectedItems.length}
+              transfers={transferRows}
+              busy={busy}
+              error={error}
+              onSettle={handleSettle}
+              onClose={closeSheet}
+            />
           )}
-          <button type="button" disabled={busy} onClick={handleSettle} className="btn btn-fill">
-            選択した {selectedItems.length} 件を精算する
-          </button>
-        </section>
+        </>
       )}
     </>
   );
